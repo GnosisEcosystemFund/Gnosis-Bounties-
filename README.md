@@ -1,4 +1,4 @@
-# Gnosis-Bounties
+# Gnosis Bounties
 
 
 
