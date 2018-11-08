@@ -21,6 +21,17 @@ contract("Buyback", accounts => {
 
 
     before ( async() => {
+        
+        Promise.all([
+            TokenFRT.deployed(),
+            EtherToken.deployed(),
+            TokenGNO.deployed(),
+            TokenOWLProxy.deployed(),
+            PriceOracleInterface.deployed(),
+            DutchExchange.deployed(),
+            DutchExchangeProxy.deployed()
+        ])
+
         dxProxy = await DutchExchangeProxy.deployed()
         tokenGNO = await TokenGNO.deployed()
         etherToken = await EtherToken.deployed()
@@ -66,8 +77,8 @@ contract("Buyback", accounts => {
               wethAddress,
               oracleAddress,
               thresholdNewTokenPairUsd * 1e18,
-              thresholdAuctionStartUsd * 1e18
-            )
+              thresholdAuctionStartUsd * 1e18,
+            {from: BuyBackAccount})
         })
         
         it("Should create contract", async() => {
