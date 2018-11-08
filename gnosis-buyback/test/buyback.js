@@ -21,16 +21,8 @@ contract("Buyback", accounts => {
 
 
     before ( async() => {
-        
-        Promise.all([
-            TokenFRT.deployed(),
-            EtherToken.deployed(),
-            TokenGNO.deployed(),
-            TokenOWLProxy.deployed(),
-            PriceOracleInterface.deployed(),
-            DutchExchange.deployed(),
-            DutchExchangeProxy.deployed()
-        ])
+    
+        await DutchExchange.deployed()
 
         dxProxy = await DutchExchangeProxy.deployed()
         tokenGNO = await TokenGNO.deployed()
@@ -70,15 +62,8 @@ contract("Buyback", accounts => {
             console.log('\t Threshold for new token pair: %s', thresholdNewTokenPairUsd)
             console.log('\t Threshold for auction to start: %s', thresholdAuctionStartUsd)
       
-            await dx.setupDutchExchange(
-              frtAddress,
-              owlAddress,
-              owner,
-              wethAddress,
-              oracleAddress,
-              thresholdNewTokenPairUsd * 1e18,
-              thresholdAuctionStartUsd * 1e18,
-            {from: BuyBackAccount})
+            let result = await dx.ethUSDOracle.call()
+            console.log({result})
         })
         
         it("Should create contract", async() => {
@@ -114,7 +99,7 @@ contract("Buyback", accounts => {
             // const auctionIndex = await dx.getAuctionIndex.call(tokenGNO.address, etherToken.address, {from: BuyBackAccount});
             // console.log({auctionIndex})
 
-            const tokenPair = await dx.postSellOrder.call(tokenGNO.address, etherToken.address, 0, 1e18,  {from: BuyBackAccount})
+            const tokenPair = await dx.postSellOrder.call(tokenGNO.address, etherToken.address, 0, 1e18)
             // // create sell order
             console.log({tokenPair})
 
