@@ -276,7 +276,7 @@ contract BuyBack {
      * @notice postOrder approve trading
      */
     function postOrder() public {
-        uint newBuyerBalance;
+        // uint newBuyerBalance;
 
         for( uint i = 0; i < auctionIndexes.length; i++ ) {
             uint amount = auction[auctionIndexes[i]];
@@ -285,10 +285,11 @@ contract BuyBack {
             approveDutchX(amount);
             depositDutchx(amount);
 
+            // (, newBuyerBalance) = dx.postSellOrder(sellToken, buyToken, auctionIndexes[i], amount);
             balances[sellToken] -= amount;
 
-            newBuyerBalance = dx.postBuyOrder(sellToken, buyToken, auctionIndexes[i], amount);
-            emit PostSellOrder(buyToken, sellToken, balances[sellToken], amount, newBuyerBalance);
+            // emit PostSellOrder(buyToken, sellToken, balances[sellToken], amount, newBuyerBalance);
+            emit PostSellOrder(buyToken, sellToken, balances[sellToken], amount, 0);
         }
     }
 

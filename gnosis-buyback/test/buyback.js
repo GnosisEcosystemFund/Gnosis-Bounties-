@@ -2,13 +2,17 @@ const Buyback = artifacts.require("Buyback")
 const TokenGNO = artifacts.require('TokenGNO')
 const EtherToken = artifacts.require("EtherToken")
 const DutchExchangeProxy = artifacts.require("DutchExchangeProxy")
+const DutchExchange = artifacts.require("DutchExchange")
+const TokenFRT = artifacts.require('TokenFRT')
+const PriceOracleInterface = artifacts.require('PriceOracleInterface')
+const TokenOWLProxy = artifacts.require('TokenOWLProxy')
 
 const Web3 = require('web3');
 const web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545")) // Hardcoded development port
 
 contract("Buyback", accounts => {
       
-    let BuyBackAccount, SecondAccount, buyBack, etherToken, dxProxy, tokenGNO, SecondBurnAddress;
+    let BuyBackAccount, SecondAccount, buyBack, etherToken, dxProxy, dx, tokenGNO, SecondBurnAddress, priceOracleInterface, tokenFRT, owlProxy ;
 
     BuyBackAccount = accounts[0]
     SecondAccount = accounts[1]
@@ -16,33 +20,87 @@ contract("Buyback", accounts => {
     SecondBurnAddress = accounts[2]
 
 
-    before (async() => {
+    before ( async() => {
         dxProxy = await DutchExchangeProxy.deployed()
         tokenGNO = await TokenGNO.deployed()
         etherToken = await EtherToken.deployed()
+        owlProxy = await TokenOWLProxy.deployed()
+        tokenFRT =  await TokenFRT.deployed();
+        priceOracleInterface = await PriceOracleInterface.deployed()
     })
 
     function fillSellOrders(){
         // approve the dutchx contract
-        etherToken
+        // etherToken
     }
 
     describe("Test Buyback Implementation", async() => {
+
+        it("Should setup exchange", async()=> {
+            dx = DutchExchange.at(DutchExchangeProxy.address)
+            const owner = accounts[0]
+            const frtAddress = TokenFRT.address
+            const owlAddress = TokenOWLProxy.address
+            const wethAddress = EtherToken.address
+            const oracleAddress = PriceOracleInterface.address
+      
+            console.log('Setup DX with:')
+            console.log('\t Owner: %s', owner)
+            console.log('\t OWL address: %s', owlAddress)
+            console.log('\t FRT address: %s', frtAddress)
+            console.log('\t WETH address: %s', wethAddress)
+            console.log('\t Price Oracle address: %s', oracleAddress)
+            console.log('\t Threshold for new token pair: %s', thresholdNewTokenPairUsd)
+            console.log('\t Threshold for auction to start: %s', thresholdAuctionStartUsd)
+      
+            return dx.setupDutchExchange(
+              frtAddress,
+              owlAddress,
+              owner,
+              wethAddress,
+              oracleAddress,
+              thresholdNewTokenPairUsd * 1e18,
+              thresholdAuctionStartUsd * 1e18
+            )
+        })
         
         it("Should create contract", async() => {
-            console.log(`dx address`, dxProxy.address)
+
             buyBack = await Buyback.new(dxProxy.address, tokenGNO.address, etherToken.address, BurnAddress, true, [0], [1e18], {from: BuyBackAccount})
+
+            console.log(`buyBack address`, buyBack.address)
         })
 
         it("Should deposit tokens", async() => {
             // approve the buy back contract address to withdraw 1e18 tokens from etherToken
             await etherToken.deposit({from: BuyBackAccount, value: 30e18 })
+
             await etherToken.approve(buyBack.address, 20e18, {from: BuyBackAccount})
-            await etherToken.balanceOf(BuyBackAccount)
+
             await buyBack.deposit(etherToken.address, 20e18, {from: BuyBackAccount})
+            let balanceOf = await etherToken.balanceOf.call(buyBack.address)
+            console.log(`buyback balance ether `, balanceOf.toNumber() / 1e18)
+
         })
 
         it("Should allow to pariticipate in dutchx auction", async() => {
+            
+            const approve = await tokenGNO.approve(dx.address, 1e18, {from: BuyBackAccount})
+            console.log({approve})
+
+            const deposit = await dx.deposit(tokenGNO.address, 1e18, {from: BuyBackAccount});
+            console.log({deposit})
+            
+            // const startAuction = await dx.getAuctionStart.call(tokenGNO.address, etherToken.address, {from: BuyBackAccount});
+            // console.log({startAuction})
+            
+            // const auctionIndex = await dx.getAuctionIndex.call(tokenGNO.address, etherToken.address, {from: BuyBackAccount});
+            // console.log({auctionIndex})
+
+            const tokenPair = await dx.postSellOrder.call(tokenGNO.address, etherToken.address, 0, 1e18,  {from: BuyBackAccount})
+            // // create sell order
+            console.log({tokenPair})
+
             const result = await buyBack.getSellTokenBalance.call({from: BuyBackAccount})
             console.log(result.toNumber() / 1e18)
 
