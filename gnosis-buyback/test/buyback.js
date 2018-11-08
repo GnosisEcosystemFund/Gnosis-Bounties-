@@ -37,7 +37,13 @@ contract("Buyback", accounts => {
     describe("Test Buyback Implementation", async() => {
 
         it("Should setup exchange", async()=> {
-            dx = DutchExchange.at(DutchExchangeProxy.address)
+            const DEFAULT_THRESHOLD_NEW_TOKEN_PAIR_USD = 10000 // 10K USD
+            const DEFAULT_THRESHOLD_AUCTION_START_USD = 1000 // 1K USD
+
+            let thresholdNewTokenPairUsd = DEFAULT_THRESHOLD_NEW_TOKEN_PAIR_USD
+            let thresholdAuctionStartUsd = DEFAULT_THRESHOLD_AUCTION_START_USD
+
+            dx = DutchExchange.at(dxProxy.address)
             const owner = accounts[0]
             const frtAddress = TokenFRT.address
             const owlAddress = TokenOWLProxy.address
@@ -53,7 +59,7 @@ contract("Buyback", accounts => {
             console.log('\t Threshold for new token pair: %s', thresholdNewTokenPairUsd)
             console.log('\t Threshold for auction to start: %s', thresholdAuctionStartUsd)
       
-            return dx.setupDutchExchange(
+            await dx.setupDutchExchange(
               frtAddress,
               owlAddress,
               owner,
