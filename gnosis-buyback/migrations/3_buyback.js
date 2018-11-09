@@ -10,16 +10,29 @@ module.exports = function(deployer, network, accounts) {
     let dxProxy, etherToken, gnoToken
     console.log("working on deploying")
 
-    return deployer.then(() => {
-      dxProxy = DutchExchangeProxy.deployed()
+    return deployer.then(async () => {
+      dxProxy = await DutchExchangeProxy.deployed()
       console.log('dxproxy', dxProxy.address)
-    }).then(() =>{
-      etherToken = EtherToken.deployed()
-    }).then(() => {
-      gnoToken = GNOToken.deployed()
-    }).then(() => {
+    }).then(async () => {
+      etherToken = await EtherToken.deployed()
+    }).then(async () => {
+      gnoToken = await GNOToken.deployed()
+    }).then(async () => {
       console.log('faking it')
-      deployer.deploy(Buyback, dxProxy.address, gnoToken.address, etherToken.address, BurnAddress, true, [1,2,3], [1e18, 1e18, 1e18]).then(()=>{})
+      return deployer
+        .deploy(
+          Buyback,
+          dxProxy.address,
+          gnoToken.address,
+          etherToken.address,
+          BurnAddress,
+          true,
+          [1,2,3],
+          [1e18, 1e18, 1e18]
+        )
+    }).then(async () => {
+      const buyback = await Buyback.deployed()
+      console.log('buyBack deployed with address: ', buyback.address)
     })
 
 }

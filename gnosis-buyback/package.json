@@ -20,7 +20,7 @@
     "truffle": "^4.1.5"
   },
   "scripts": {
-    "test": "truffle test test/buyback.js"
+    "test": "truffle test test/buyback2.js"
   },
   "repository": {
     "type": "git",
