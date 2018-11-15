@@ -9,235 +9,188 @@ const TokenOWLProxy = artifacts.require('TokenOWLProxy')
 
 const Web3 = require('web3');
 const web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545")) // Hardcoded development port
+const {
+  waitUntilPriceIsXPercentOfPreviousPrice,
+  getAuctionIndex,
+  takeSnapshot,
+  revertToSnapshot,
+} =  require('./util')
 
-contract("Buyback", accounts => {
-      
-    let BuyBackAccount, SecondAccount, buyBack, etherToken, dxProxy, dx, tokenGNO, SecondBurnAddress, priceOracleInterface, tokenFRT, owlProxy ;
+contract('Buyback', (accounts) => {
+  
+  let buyBack, InitAccount, BuyBackAccount ,SecondAccount, etherToken, dxProxy, dx, tokenGNO, SecondBurnAddress, priceOracleInterface, tokenFRT, owlProxy ;
 
-    BuyBackAccount = accounts[0]
-    SecondAccount = accounts[1]
-    BurnAddress = accounts[3]
-    SecondBurnAddress = accounts[2]
+  InitAccount = accounts[0]
+  SellerAccount  = accounts[1]
+  BurnAddress    = accounts[2]
+  SecondBurnAddress = accounts[3]
 
+  before ( async() => {
+    buyBack = await Buyback.deployed()
+    BuyBackAccount = buyBack.address
+    console.log({BuyBackAccount})
 
-    before ( async() => {
+    const dxAddress = await buyBack.dx.call()
+
+    dx = DutchExchange.at(dxAddress)
     
-        await DutchExchange.deployed()
+    tokenGNO = await TokenGNO.deployed()
+    etherToken = await EtherToken.deployed()
+    owlProxy = await TokenOWLProxy.deployed()
+    tokenFRT =  await TokenFRT.deployed();
+    priceOracleInterface = await PriceOracleInterface.deployed()
+    
+    const ethUsdPrice = await dx.ethUSDOracle.call()    
+    console.log(`
+      dx: ${dxAddress}
+      buyBack: ${buyBack.address}
+      ethUsdPrice: ${ethUsdPrice}
+    `)
+  })
 
-        dxProxy = await DutchExchangeProxy.deployed()
-        tokenGNO = await TokenGNO.deployed()
-        etherToken = await EtherToken.deployed()
-        owlProxy = await TokenOWLProxy.deployed()
-        tokenFRT =  await TokenFRT.deployed();
-        priceOracleInterface = await PriceOracleInterface.deployed()
-    })
+  it("Should add buyback", async() => {
+    await buyBack.addBuyBack(InitAccount,  tokenGNO.address, etherToken.address, BurnAddress, true, [0,0], [1e18,1e18], 0, {from: InitAccount}); 
+  })
 
-    function fillSellOrders(){
-        // approve the dutchx contract
-        // etherToken
-    }
-
-    describe("Test Buyback Implementation", async() => {
-
-        it("Should setup exchange", async()=> {
-            const DEFAULT_THRESHOLD_NEW_TOKEN_PAIR_USD = 10000 // 10K USD
-            const DEFAULT_THRESHOLD_AUCTION_START_USD = 1000 // 1K USD
-
-            let thresholdNewTokenPairUsd = DEFAULT_THRESHOLD_NEW_TOKEN_PAIR_USD
-            let thresholdAuctionStartUsd = DEFAULT_THRESHOLD_AUCTION_START_USD
-
-            dx = DutchExchange.at(dxProxy.address)
-            const owner = accounts[0]
-            const frtAddress = TokenFRT.address
-            const owlAddress = TokenOWLProxy.address
-            const wethAddress = EtherToken.address
-            const oracleAddress = PriceOracleInterface.address
-      
-            console.log('Setup DX with:')
-            console.log('\t Owner: %s', owner)
-            console.log('\t OWL address: %s', owlAddress)
-            console.log('\t FRT address: %s', frtAddress)
-            console.log('\t WETH address: %s', wethAddress)
-            console.log('\t Price Oracle address: %s', oracleAddress)
-            console.log('\t Threshold for new token pair: %s', thresholdNewTokenPairUsd)
-            console.log('\t Threshold for auction to start: %s', thresholdAuctionStartUsd)
-      
-            let result = await dx.ethUSDOracle.call()
-            console.log({result})
-        })
-        
-        it("Should create contract", async() => {
-
-            buyBack = await Buyback.new(dxProxy.address, tokenGNO.address, etherToken.address, BurnAddress, true, [0], [1e18], {from: BuyBackAccount})
-
-            console.log(`buyBack address`, buyBack.address)
-        })
-
-        it("Should deposit tokens", async() => {
-            // approve the buy back contract address to withdraw 1e18 tokens from etherToken
-            await etherToken.deposit({from: BuyBackAccount, value: 30e18 })
-
-            await etherToken.approve(buyBack.address, 20e18, {from: BuyBackAccount})
-
-            await buyBack.deposit(etherToken.address, 20e18, {from: BuyBackAccount})
-            let balanceOf = await etherToken.balanceOf.call(buyBack.address)
-            console.log(`buyback balance ether `, balanceOf.toNumber() / 1e18)
-
-        })
-
-        it("Should allow to pariticipate in dutchx auction", async() => {
-            
-            const approve = await tokenGNO.approve(dx.address, 1e18, {from: BuyBackAccount})
-            console.log({approve})
-
-            const deposit = await dx.deposit(tokenGNO.address, 1e18, {from: BuyBackAccount});
-            console.log({deposit})
-            
-            // const startAuction = await dx.getAuctionStart.call(tokenGNO.address, etherToken.address, {from: BuyBackAccount});
-            // console.log({startAuction})
-            
-            // const auctionIndex = await dx.getAuctionIndex.call(tokenGNO.address, etherToken.address, {from: BuyBackAccount});
-            // console.log({auctionIndex})
-
-            const tokenPair = await dx.postSellOrder.call(tokenGNO.address, etherToken.address, 0, 1e18)
-            // // create sell order
-            console.log({tokenPair})
-
-            const result = await buyBack.getSellTokenBalance.call({from: BuyBackAccount})
-            console.log(result.toNumber() / 1e18)
-
-            const buy = await buyBack.postOrder({from: BuyBackAccount});
-            console.log(buy.logs[0])
-
-            const second = await buyBack.getSellTokenBalance.call({from: BuyBackAccount})
-            console.log(second.toNumber() / 1e18)
-
-        })
-
-        // it("Should allow to claim funds from dutchx auction & burn it", async() => {
-        //     await buyBack.claim({from: BuyBackAccount});
-        // })
-        // it("Should allow to claim funds from dutchx auction & burn it to an address", async() => {
-        //     await buyBack.claim({from: BuyBackAccount});
-        // })
-
-        // it("Should allow to claim funds from dutchx auction & not burn it", async() => {
-        //     await buyBack.claim({from: BuyBackAccount});
-        // })
-
-        // it("Should prevent deposit with amount 0", async() => {
-        //     // approve the buy back contract address to withdraw 1e18 tokens from etherToken
-        //     let errorThrown = false
-        //     try {
-        //         await buyBack.deposit(etherToken.address, 0, {from: BuyBackAccount})
-        //     } catch(e) {
-        //         errorThrown = true
-        //     }
-        //     assert.ok(errorThrown, "Should prevent deposit with amount 0");
-        // })
-
-        // it("Should prevent deposit of tokens different from the sell token", async() => {
-        //     // approve the buy back contract address to withdraw 1e18 tokens from etherToken
-        //     let errorThrown = false
-        //     try {
-        //         await buyBack.deposit(tokenGNO.address, 10e18, {from: BuyBackAccount})
-        //     } catch(e) {
-        //         errorThrown = true
-        //     }
-        //     assert.ok(errorThrown, "Should prevent deposit with amount 0");
-        // })
-
-        // const auctionIndexes = [1, 2, 3] 
-        // const auctionAmounts = [1e17, 1e19, 1e18]
-
-        // it("Should allow modification of auction amount & index", async () => {
-           
-        //     await buyBack.modifyAuctionsMulti(auctionIndexes, auctionAmounts)
-        // })
-
-        // it("Should prevent modifying auction with invalid length", async() => {
-        //     let errorThrown = false
-        //     try {
-        //         let auctionIndexes = [1,2,3,4] 
-        //         let auctionAmounts =  [1e17, 1e19]
-        //         await buyBack.modifyAuctionsMulti(auctionIndexes, auctionAmounts)
-        //     } catch(e) {
-        //         errorThrown = true
-        //     }
-        //     assert.ok(errorThrown, "Should prevent modifying auction with invalid length");
-        // })
-
-        // it("Should prevent modifying auction with empty array", async() => {
-        //     let errorThrown = false
-        //     try {
-        //         let auctionIndexes = [] 
-        //         let auctionAmounts =  [1e17, 1e19]
-        //         await buyBack.modifyAuctionsMulti(auctionIndexes, auctionAmounts)
-        //     } catch(e) {
-        //         errorThrown = true
-        //     }
-        //     assert.ok(errorThrown, "Should prevent modifying auction with invalid length");
-        // })
-
-        // it("Should get all the created auction indexes", async() => {
-        //     const result = await buyBack.getAuctionIndexes({from: BuyBackAccount});
-
-        //     assert.equal(result[0].toNumber(), auctionIndexes[0], "Invalid details")
-        //     assert.equal(result[1].toNumber(), auctionIndexes[1], "Invalid details")
-        //     assert.equal(result[2].toNumber(), auctionIndexes[2], "Invalid details")
-        // })
-
-        // it("Should get the auction amount with auction index", async() => {
-        //     for(let index in auctionIndexes) {
-        //         const result = await buyBack.getAuctionAmount(auctionIndexes[index], {from: BuyBackAccount});
-        //         assert.equal(result.toNumber(), auctionAmounts[index], "Invalid details")
-        //     }
-        // })
-
-        // it("Should delete an auction using auction index if its not pariticipated in ", async() => {
-        //     const result = await buyBack.deleteAuction(0, {from: BuyBackAccount});
-
-        //     assert.equal(result.logs[0].args.auctionIndex, auctionIndexes[0], "Failed to delete auction using index")
-        //     assert.equal(result.logs[0].args.amount, auctionAmounts[0], "Failed to delete auction using index")
-        // })
-
-        // it("Should delete multiple auction amount with auction index", async() => {
-        //     const result = await buyBack.deleteAuctionMulti([0, 0], {from: BuyBackAccount});
-        //     let i = 1
-        //     for(let log of result.logs){
-        //         assert.equal(log.args.auctionIndex, auctionIndexes[i], "Failed to delete auction using index")
-        //         assert.equal(log.args.amount, auctionAmounts[i], "Failed to delete auction using index")
-        //         i++
-        //     }
-        // })
-
-        // it("Should prevent deleting multiple auction with empty array", async() => {
-        //     let errorThrown = false
-        //     try {
-        //         await buyBack.deleteAuctionMulti([], {from: BuyBackAccount});
-        //     } catch(e) {
-        //         errorThrown = true
-        //     }
-        //     assert.ok(errorThrown, "Should prevent deleting auction with invalid length");
-        // });
-
-        // it("Should allow to get burn address", async() => {
-        //     const address = await buyBack.getBurnAddress({from: BuyBackAccount});
-        //     assert.equal(address, BurnAddress, "Invalid burn addresses")
-        // });
-
-        // it("Should allow to modify burn", async() => {
-        //     await buyBack.modifyBurn(true, {from: BuyBackAccount});
-        // });
-
-        // it("Should allow to modify burn address", async() => {
-        //     await buyBack.modifyBurnAddress(SecondBurnAddress, {from: BuyBackAccount});
-        //     const address = await buyBack.getBurnAddress({from: BuyBackAccount});
-        //     assert.equal(address, SecondBurnAddress, "Invalid burn addresses")
-        // });
+  it("Should remove buyback", async() => {
+    await buyBack.removeBuyBack(InitAccount, {from: InitAccount});
+  })
 
 
 
-        
-    })
+
+  it("Should deposit tokens", async() => {
+    await etherToken.deposit({from: InitAccount, value: 100e18 })
+
+    await etherToken.transfer(SellerAccount, 20e18, {from: InitAccount})
+    await tokenGNO.transfer(SellerAccount, 20e18, {from: InitAccount})
+
+
+    // approve the buy back contract address to withdraw 1e18 tokens from etherToken
+    await etherToken.approve(BuyBackAccount, 40e18, {from: InitAccount})
+
+    // deposits ethertoken
+    await buyBack.depositSellToken(InitAccount, 20e18, {from: InitAccount})
+    await buyBack.depositSellToken(InitAccount, 20e18, {from: InitAccount})
+
+
+    const balance = await buyBack.getSellTokenBalance(InitAccount, {from: InitAccount})
+
+    assert.equal(balance.toNumber(), 40e18, "Failed to deposit tokens")
+
+    console.log(`
+    ------------- Beginning Balances --------------- \n
+    Seller Account - \n
+    \t EtherToken = ${await etherToken.balanceOf.call(SellerAccount) / 1e18}
+    \t TokenGNO: ${await tokenGNO.balanceOf.call(SellerAccount) / 1e18}
+    Init Acccount - \n
+    \t EtherToken = ${await etherToken.balanceOf.call(InitAccount) / 1e18}
+    \t TokenGNO: ${await tokenGNO.balanceOf.call(InitAccount) / 1e18}
+    BuyBack Balance - \n
+    \t EtherToken = ${await etherToken.balanceOf.call(BuyBackAccount) / 1e18}
+    \t TokenGNO: ${await tokenGNO.balanceOf.call(BuyBackAccount) / 1e18}
+    -------------------------------------
+    `)
+  })
+
+  it("Should allow to pariticipate in dutchx auction, claim funds & burn it to an address", async() => {
+    let snap_id = await takeSnapshot();
+
+    const approve = await tokenGNO.approve(dx.address, 10e18, {from: SellerAccount})
+    console.log({approve})
+
+    const etherApprove = await etherToken.approve(dx.address, 10e18, {from: SellerAccount})
+    console.log({etherApprove})
+
+    const depositToken = await dx.deposit(tokenGNO.address, 10e18, {from: SellerAccount});
+    console.log({depositToken})
+
+    const depositEther =  await dx.deposit(etherToken.address, 10e18, {from: SellerAccount});
+    console.log({depositEther})
+
+    const tokenPair = await dx.addTokenPair(etherToken.address, tokenGNO.address, 2e18, 0, 2, 1, {from: SellerAccount})
+    console.log({tokenPair})
+
+    const auctionIndex = (await dx.getAuctionIndex.call(etherToken.address, tokenGNO.address)).toNumber();
+    console.log({auctionIndex})
+
+    // // create sell order
+
+    const result = await buyBack.getSellTokenBalance(InitAccount, {from: InitAccount})
+    console.log(result.toNumber() / 1e18)
+
+    const sellOrder = await buyBack.postSellOrder(InitAccount, {from: InitAccount});
+
+    console.log(sellOrder.logs[0])
+    console.log('sellorder')
+    console.log(sellOrder.logs[0].args.newSellerBalance.toNumber())
+
+
+    let buyVolumes = (await dx.buyVolumes.call(etherToken.address, tokenGNO.address)).toNumber()
+    let sellVolumes = (await dx.sellVolumesCurrent.call(etherToken.address, tokenGNO.address)).toNumber()
+
+    console.log(`
+    ----
+    Current Buy Volume BEFORE Posting => ${buyVolumes}
+    Current Sell Volume               => ${sellVolumes}
+    ----
+    `)
+
+    await waitUntilPriceIsXPercentOfPreviousPrice(dx, etherToken, tokenGNO, 1)
+
+    const buyOrder = await dx.postBuyOrder(etherToken.address, tokenGNO.address, 1, 10e18,  {from: SellerAccount})
+    console.log({buyOrder})
+    // const buyOrder1 = await dx.postBuyOrder(etherToken.address, tokenGNO.address, 1, 2e18,  {from: SellerAccount})
+    // console.log({buyOrder1})
+
+
+    console.log('balance of seller', (await dx.balances.call(tokenGNO.address, SellerAccount)).toNumber())
+
+    
+  //   // const startAuction = await dx.getAuctionStart.call(tokenGNO.address, etherToken.address, {from: BuyBackAccount});
+  //   // console.log({startAuction})
+    
+  //   //
+    console.log("auction index")
+    console.log(await getAuctionIndex(dx, tokenGNO, etherToken))
+    const auctionWasClosed = (auctionIndex + 1 === (await getAuctionIndex(dx, tokenGNO, etherToken)))
+    console.log({auctionWasClosed})
+
+    const getBuyerBalance = (await dx.buyerBalances.call(etherToken.address, tokenGNO.address,  1, SellerAccount)).toNumber()
+    console.log({getBuyerBalance})
+
+    const getSellerBalance = (await dx.sellerBalances.call(etherToken.address, tokenGNO.address, 1, BuyBackAccount)).toNumber()
+    console.log({getSellerBalance})
+
+  //   const second = await buyBack.getSellTokenBalance.call({from: BuyBackAccount})
+  //   console.log(second.toNumber() / 1e18)
+
+   buyVolumes = (await dx.buyVolumes.call(etherToken.address, tokenGNO.address))
+     sellVolumes = (await dx.sellVolumesCurrent.call(etherToken.address, tokenGNO.address))
+
+    console.log(`
+    ----
+    Current Buy Volume BEFORE Posting => ${buyVolumes}
+    Current Sell Volume               => ${sellVolumes}
+    ----
+    `)
+
+    const claimFunds = await buyBack.claim(InitAccount, {from: InitAccount});
+    console.log({claimFunds})
+
+    // check burn address for balance
+    const burnBalance = (await tokenGNO.balanceOf.call(BurnAddress)).toNumber()
+    console.log({burnBalance})
+      // const cliam = await buyBack.
+
+    
+    await revertToSnapshot(snap_id)
+  })
+
+  it("Should be able to claim funds and burn it", async() => {
+
+
+
+  })
+
 })

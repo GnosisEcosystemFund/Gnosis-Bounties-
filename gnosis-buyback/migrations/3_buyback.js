@@ -18,17 +18,10 @@ module.exports = function(deployer, network, accounts) {
     }).then(async () => {
       gnoToken = await GNOToken.deployed()
     }).then(async () => {
-      console.log('faking it')
       return deployer
         .deploy(
           Buyback,
           dxProxy.address,
-          gnoToken.address,
-          etherToken.address,
-          BurnAddress,
-          true,
-          [1,2,3],
-          [1e18, 1e18, 1e18]
         )
     }).then(async () => {
       const buyback = await Buyback.deployed()
