@@ -14,7 +14,7 @@ const {
   getAuctionIndex,
   takeSnapshot,
   revertToSnapshot,
-} =  require('./util')
+} = require('./util')
 
 contract('Buyback', (accounts) => {
   
@@ -55,9 +55,6 @@ contract('Buyback', (accounts) => {
   it("Should remove buyback", async() => {
     await buyBack.removeBuyBack(InitAccount, {from: InitAccount});
   })
-
-
-
 
   it("Should deposit tokens", async() => {
     await etherToken.deposit({from: InitAccount, value: 100e18 })

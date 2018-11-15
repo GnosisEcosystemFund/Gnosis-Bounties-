@@ -17,7 +17,7 @@ contract BuyBack {
         address burnAddress;
         bool shouldBurnToken;
         uint[] auctionIndexes; // This is a mapping of auction id to amount
-        uint[] auctionAmounts;
+        // uint[] auctionAmounts;
         uint minTimeInterval; // time interval between poking in seconds
         uint lastTimeProcessed;
         bool claimedLastSellOrder;
@@ -160,7 +160,7 @@ contract BuyBack {
             auction[_userAddress][_auctionIndexes[i]] = _auctionAmounts[i];
         }
 
-        Buyback memory buyback = Buyback(_sellToken, _buyToken, _burnAddress, _burn, _auctionIndexes, _auctionAmounts, _timeInterval, 0, true);
+        Buyback memory buyback = Buyback(_sellToken, _buyToken, _burnAddress, _burn, _auctionIndexes, _timeInterval, 0, true);
 
         // map user address to the buyback config
         buybacks[_userAddress] = buyback;
@@ -180,30 +180,31 @@ contract BuyBack {
     /**
      * @notice modifyAuctionAmountMulti modify the amount for multiple auction index
      * @param _userAddress User addresss
-     * @param _indexes Auction index the to participate 
+     * @param _auctionIndexes Auction index the to participate 
      * @param _auctionAmounts Auction amount to fill in auction index
      */
-    function modifyAuctionAmountMulti(address _userAddress, uint[] _indexes, uint[] _auctionAmounts) external onlyOwner  {
-        require(_indexes.length > 0);
-        require(_indexes.length == _auctionAmounts.length);
+    function modifyAuctionAmountMulti(address _userAddress, uint[] _auctionIndexes, uint[] _auctionAmounts) external onlyOwner  {
+        require(_auctionIndexes.length > 0);
+        require(_auctionIndexes.length == _auctionAmounts.length);
 
-        for(uint i = 0; i < _indexes.length; i++){
-            modifyAuctionAmount(_userAddress, _indexes[i], _auctionAmounts[i]);
+        for(uint i = 0; i < _auctionIndexes.length; i++){
+            modifyAuctionAmount(_userAddress, _auctionIndexes[i], _auctionAmounts[i]);
         }
     }
 
     /**
      * @notice modifyAuctionAmount modify the amount for an auction index
-     * @param _index Auction index the to participate 
+     * @param _auctionIndex Auction index the to participate 
      * @param _auctionAmount Auction amount to fill in auction index
      */
-    function modifyAuctionAmount(address _userAddress, uint _index, uint _auctionAmount) public onlyOwner {
+    function modifyAuctionAmount(address _userAddress, uint _auctionIndex, uint _auctionAmount) public onlyOwner {
         require(_auctionAmount > 0);
         // checks if the auction index exists
-        require(buybacks[_userAddress].auctionAmounts[_index] > 0);
+        // require(buybacks[_userAddress].auctionAmounts[_index] > 0);
+        require(auction[_userAddress][_auctionIndex] > 0);
 
-        buybacks[_userAddress].auctionAmounts[_index] = _auctionAmount;
-        emit ModifyAuction(_index, _auctionAmount);
+        auction[_userAddress][_auctionIndex] = _auctionAmount;
+        emit ModifyAuction(_auctionIndex, _auctionAmount);
     }
 
     /**
@@ -229,13 +230,9 @@ contract BuyBack {
      */
     function modifyAuctionIndex(address _userAddress, uint _auctionIndex, uint _auctionAmount) public onlyOwner {
         require(_auctionAmount > 0);
-        // require(buybacks[_userAddress].auctionAmounts[_index] > 0);
+        require(auction[_userAddress][_auctionIndex] == 0);
 
-        if(auction[_userAddress][_auctionIndex] == 0){
-            // a new auction index
-            // add it to auctionIndexes
-            buybacks[_userAddress].auctionIndexes.push(_auctionIndex);
-        }
+        buybacks[_userAddress].auctionIndexes.push(_auctionIndex);
         auction[_userAddress][_auctionIndex] = _auctionAmount;
         emit ModifyAuction(_auctionIndex, _auctionAmount);
     }
