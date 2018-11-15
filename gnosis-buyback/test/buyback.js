@@ -9,21 +9,55 @@ const TokenOWLProxy = artifacts.require('TokenOWLProxy')
 
 const Web3 = require('web3');
 const web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545")) // Hardcoded development port
+
 const {
   waitUntilPriceIsXPercentOfPreviousPrice,
   getAuctionIndex,
   takeSnapshot,
   revertToSnapshot,
+  catchRevert,
 } = require('./util')
 
 contract('Buyback', (accounts) => {
   
-  let buyBack, InitAccount, BuyBackAccount ,SecondAccount, etherToken, dxProxy, dx, tokenGNO, SecondBurnAddress, priceOracleInterface, tokenFRT, owlProxy ;
+  const deposit = async () => {
+    await etherToken.deposit({from: InitAccount, value: 100e18 })
+
+    await etherToken.transfer(SellerAccount, 20e18, {from: InitAccount})
+    await tokenGNO.transfer(SellerAccount, 20e18, {from: InitAccount})
+
+    // approve the buy back contract address to withdraw 1e18 tokens from etherToken
+    await etherToken.approve(BuyBackAccount, 40e18, {from: InitAccount})
+
+    // deposits ethertoken
+    await buyBack.depositSellToken(InitAccount, 20e18, {from: InitAccount})
+    await buyBack.depositSellToken(InitAccount, 20e18, {from: InitAccount})
+
+    const balance = await buyBack.getSellTokenBalance(InitAccount, {from: InitAccount})
+    assert.equal(balance.toNumber(), 40e18, "Failed to deposit tokens")
+
+    console.log(`
+    ------------- Beginning Balances --------------- \n
+    Seller Account - \n
+    \t EtherToken = ${await etherToken.balanceOf.call(SellerAccount) / 1e18}
+    \t TokenGNO: ${await tokenGNO.balanceOf.call(SellerAccount) / 1e18}
+    Init Acccount - \n
+    \t EtherToken = ${await etherToken.balanceOf.call(InitAccount) / 1e18}
+    \t TokenGNO: ${await tokenGNO.balanceOf.call(InitAccount) / 1e18}
+    BuyBack Balance - \n
+    \t EtherToken = ${await etherToken.balanceOf.call(BuyBackAccount) / 1e18}
+    \t TokenGNO: ${await tokenGNO.balanceOf.call(BuyBackAccount) / 1e18}
+    -------------------------------------
+    `)
+  }
+
+  let buyBack, InitAccount, BuyBackAccount ,SecondAccount, etherToken, dxProxy, dx, tokenGNO, SecondBurnAddress, priceOracleInterface, tokenFRT, owlProxy, snapId ;
 
   InitAccount = accounts[0]
   SellerAccount  = accounts[1]
   BurnAddress    = accounts[2]
   SecondBurnAddress = accounts[3]
+  WithdrawalAddress = accounts[4]
 
   before ( async() => {
     buyBack = await Buyback.deployed()
@@ -46,53 +80,104 @@ contract('Buyback', (accounts) => {
       buyBack: ${buyBack.address}
       ethUsdPrice: ${ethUsdPrice}
     `)
+
+    //takeSnapshot
+    snapId = await takeSnapshot();
   })
+
 
   it("Should add buyback", async() => {
-    await buyBack.addBuyBack(InitAccount,  tokenGNO.address, etherToken.address, BurnAddress, true, [0,0], [1e18,1e18], 0, {from: InitAccount}); 
+    await buyBack.addBuyBack(InitAccount,  tokenGNO.address, etherToken.address, BurnAddress, true, [0,1], [1e18,1e18], 0, {from: InitAccount}); 
   })
 
-  it("Should remove buyback", async() => {
-    await buyBack.removeBuyBack(InitAccount, {from: InitAccount});
+  it("Should allow to modify burn", async() => {
+    await buyBack.modifyBurn(InitAccount, false, {from: InitAccount});
+  });
+
+  it("Should allow to modify burn address", async() => {
+    await buyBack.modifyBurnAddress(InitAccount, SecondBurnAddress, {from: InitAccount});
+    const addr = await buyBack.getBurnAddress.call(InitAccount);
+    assert.equal(addr, SecondBurnAddress, "failed to modify burn address");
+  });
+
+  it("Should allow to modify auction amount", async() => {
+    await buyBack.modifyAuctionAmount(InitAccount, 1, 2e18, {from: InitAccount});
+    const newBal = (await buyBack.getAuctionAmount.call(InitAccount, 1)).toNumber();
+    assert.equal(2e18, newBal, "failed to modify auction amount");
+  });
+
+  it("Should allow to modify auction amount multi", async() => {
+    await buyBack.modifyAuctionAmountMulti(InitAccount, [1], [3e18], {from: InitAccount});
+    const newBal = (await buyBack.getAuctionAmount.call(InitAccount, 1)).toNumber();
+    assert.equal(3e18, newBal, "failed to modify auction amount");
   })
+
+  it("Should prevent modifying auction multi with invalid array", async() => {
+    catchRevert(
+      buyBack.modifyAuctionAmountMulti(InitAccount, [1,3], [3e18], {from: InitAccount})
+    )
+  })
+
+  it("Should allow to modify auction index", async() => {
+    await buyBack.modifyAuctionIndex(InitAccount, 3, 1e18, {from: InitAccount});
+    // (address _userAddress, uint _auctionIndex, uint _auctionAmount)
+    const indexes = (await buyBack.getAuctionIndexes.call(InitAccount));
+    assert.equal(indexes.length, 3, "Failed to modify auction indexes")
+  })
+
+  it("Should allow to modify auction index multi", async() => {
+    await buyBack.modifyAuctionIndexMulti(InitAccount, [4, 5], [1e18, 1e18], {from: InitAccount});
+    // (address _userAddress, uint _auctionIndex, uint _auctionAmount)
+    const indexes = (await buyBack.getAuctionIndexes.call(InitAccount));
+    assert.equal(indexes.length, 5, "Failed to modify auction indexes")
+  })
+
+  it("Should prevent modify auction index multi with invalid array length", async() => {
+    catchRevert(
+      buyBack.modifyAuctionIndexMulti(InitAccount, [4,5], [1e18], {from: InitAccount})
+    )
+  })
+
+  it("Should allow to modify sell token", async() => {
+  
+  })
+
+  it("Should allow to modify buy token", async() => {
+
+  })
+
 
   it("Should deposit tokens", async() => {
-    await etherToken.deposit({from: InitAccount, value: 100e18 })
+    await deposit();
+  })
 
-    await etherToken.transfer(SellerAccount, 20e18, {from: InitAccount})
-    await tokenGNO.transfer(SellerAccount, 20e18, {from: InitAccount})
+  it("Should prevent removing buyback with balance not 0", async() => {
+    catchRevert(
+      buyBack.removeBuyBack(InitAccount, {from: InitAccount})
+    )
+  })
 
+  it("Should withdraw all the balance", async() => {
+    await buyBack.withdraw(InitAccount, etherToken.address, WithdrawalAddress, 40e18, {from: InitAccount})
+    const balance = await buyBack.getTokenBalance.call( InitAccount, etherToken.address);
+    assert.equal(balance, 0, "Failed to withdraw tokens")
+  })
 
-    // approve the buy back contract address to withdraw 1e18 tokens from etherToken
-    await etherToken.approve(BuyBackAccount, 40e18, {from: InitAccount})
-
-    // deposits ethertoken
-    await buyBack.depositSellToken(InitAccount, 20e18, {from: InitAccount})
-    await buyBack.depositSellToken(InitAccount, 20e18, {from: InitAccount})
-
-
-    const balance = await buyBack.getSellTokenBalance(InitAccount, {from: InitAccount})
-
-    assert.equal(balance.toNumber(), 40e18, "Failed to deposit tokens")
-
-    console.log(`
-    ------------- Beginning Balances --------------- \n
-    Seller Account - \n
-    \t EtherToken = ${await etherToken.balanceOf.call(SellerAccount) / 1e18}
-    \t TokenGNO: ${await tokenGNO.balanceOf.call(SellerAccount) / 1e18}
-    Init Acccount - \n
-    \t EtherToken = ${await etherToken.balanceOf.call(InitAccount) / 1e18}
-    \t TokenGNO: ${await tokenGNO.balanceOf.call(InitAccount) / 1e18}
-    BuyBack Balance - \n
-    \t EtherToken = ${await etherToken.balanceOf.call(BuyBackAccount) / 1e18}
-    \t TokenGNO: ${await tokenGNO.balanceOf.call(BuyBackAccount) / 1e18}
-    -------------------------------------
-    `)
+  it("Should remove buyback with balance 0", async() => {
+      await buyBack.removeBuyBack(InitAccount, {from: InitAccount})
   })
 
   it("Should allow to pariticipate in dutchx auction, claim funds & burn it to an address", async() => {
-    let snap_id = await takeSnapshot();
+    await revertToSnapshot(snapId) // revert to the snapshot
 
+    // add buyback
+    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, BurnAddress, true, [0,0], [1e18,1e18], 0, {from: InitAccount}); 
+
+
+    // deposit tokens
+    await deposit();
+
+    
     const approve = await tokenGNO.approve(dx.address, 10e18, {from: SellerAccount})
     console.log({approve})
 
@@ -181,12 +266,10 @@ contract('Buyback', (accounts) => {
       // const cliam = await buyBack.
 
     
-    await revertToSnapshot(snap_id)
+    // await revertToSnapshot(snap_id)
   })
 
   it("Should be able to claim funds and burn it", async() => {
-
-
 
   })
 

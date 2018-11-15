@@ -57,11 +57,17 @@ contract BuyBack {
         uint[] auctionAmounts
     );
 
-    event Withdraw(
+    event ClaimWithdraw(
         address indexed sellToken,
         address indexed buyToken,
         uint balance,
         uint auctionIndex
+    );
+
+    event Withdraw(
+        address indexed tokenAddress,
+        uint amount,
+        uint balance
     );
 
     event Deposit(        
@@ -194,6 +200,7 @@ contract BuyBack {
 
     /**
      * @notice modifyAuctionAmount modify the amount for an auction index
+     * @param _userAddress user addrese
      * @param _auctionIndex Auction index the to participate 
      * @param _auctionAmount Auction amount to fill in auction index
      */
@@ -342,9 +349,8 @@ contract BuyBack {
     /**
      * @notice deleteAuctionIndexs delete an Auction
      * @param _userAddress User addresss
-     * @param _indexes indexes of the auction in array
      */
-    function removeAuction(address _userAddress) public onlyOwner {
+    function removeBuyBack(address _userAddress) public onlyOwner {
         require(buybacks[_userAddress].auctionIndexes.length > 0);
 
         // remove all auction indexes 
@@ -368,8 +374,6 @@ contract BuyBack {
 
         emit RemoveAuction(_userAddress, auctionIndexes);
     }
-
-
     
     /**
      * @notice modifyBurn should burn the bought tokens
@@ -415,12 +419,23 @@ contract BuyBack {
     }
 
     /**
+     * @notice getSellBalance
+     * @param _userAddress User addresss
+     * @param _tokenAddress User addresss
+     */
+    function getTokenBalance(address _userAddress, address _tokenAddress) public view returns (uint) {
+        return balances[_userAddress][_tokenAddress];
+    }
+
+    /**
      * @notice depositSellToken
      * @param _userAddress Address of the deposited token 
      * @param _amount Amount of tokens deposited 10^18
      */
     function depositSellToken(address _userAddress, uint _amount) public returns (uint) {
         require(_amount > 0);
+        require(buybacks[_userAddress].sellToken != address(0));
+
         address sellToken = buybacks[_userAddress].sellToken;
         require(Token(sellToken).transferFrom(msg.sender, this, _amount));
         
@@ -476,13 +491,12 @@ contract BuyBack {
             (dxAuctionIndex, newBuyerBalance) = dx.postSellOrder(sellToken, buyToken, auctionIndexes[i], amount);
 
             dxAuctionIndexMap[_userAddress][auctionIndexes[i]] = dxAuctionIndex; // maps the auctionindex to the auctionIndex from dx
-
             balances[_userAddress][sellToken] -= amount;
-    
-            buybacks[_userAddress].lastTimeProcessed = now;
-            buybacks[_userAddress].claimedLastSellOrder = false;
-            emit PostSellOrder(_userAddress, buyToken, sellToken, balances[_userAddress][sellToken], amount, dxAuctionIndex);
         }
+
+        buybacks[_userAddress].lastTimeProcessed = now;
+        buybacks[_userAddress].claimedLastSellOrder = false;
+        emit PostSellOrder(_userAddress, buyToken, sellToken, balances[_userAddress][sellToken], amount, dxAuctionIndex);
     }
 
 
@@ -539,9 +553,24 @@ contract BuyBack {
                 balances[_userAddress][buyToken] += balance; 
             }
             
-            emit Withdraw(sellToken, buyToken, balance, newBal);
+            emit ClaimWithdraw(sellToken, buyToken, balance, newBal);
 
         }
+    }
+
+     /**
+     * @notice approve trading
+     * @param _userAddress User addresss
+     */
+    function withdraw(address _userAddress, address _tokenAddress, address _toAddress, uint _amount) external {
+        require(_amount > 0);
+        require(buybacks[_userAddress].auctionIndexes.length > 0); // ensure user exists
+        require(balances[_userAddress][_tokenAddress] >= _amount);     
+
+        balances[_userAddress][_tokenAddress] -= _amount;
+        require(Token(_tokenAddress).transfer(_toAddress, _amount));
+        emit Withdraw(_tokenAddress, _amount, balances[_userAddress][_tokenAddress]);
+
     }
 
     /**

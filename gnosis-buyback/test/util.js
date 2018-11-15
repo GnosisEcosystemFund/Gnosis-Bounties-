@@ -123,6 +123,7 @@ const waitUntilPriceIsXPercentOfPreviousPrice = async (dx, ST, BT, p) => {
 }
 
 function revertToSnapshot(snapShotId) {
+    console.log("reverting")
     return new Promise((resolve, reject) => {
         web3.currentProvider.sendAsync(
             {
@@ -142,10 +143,35 @@ function revertToSnapshot(snapShotId) {
     });
 }
 
+const PREFIX = "VM Exception while processing transaction: ";
+const PREFIX2 = "Returned error: VM Exception while processing transaction: ";
+
+async function tryCatch(promise, message) {
+    try {
+        await promise;
+        throw null;
+    } catch (error) {
+        assert(error, "Expected an error but did not get one");
+        try {
+            assert(
+                error.message.startsWith(PREFIX + message),
+                "Expected an error starting with '" + PREFIX + message + "' but got '" + error.message + "' instead"
+            );
+        } catch (err) {
+            assert(
+                error.message.startsWith(PREFIX2 + message),
+                "Expected an error starting with '" + PREFIX + message + "' but got '" + error.message + "' instead"
+            );
+        }
+    }
+}
 
 module.exports = {
     waitUntilPriceIsXPercentOfPreviousPrice,
     getAuctionIndex,
     takeSnapshot,
     revertToSnapshot,
+    catchRevert: async function(promise) {
+        await tryCatch(promise, "revert");
+    }
 }
