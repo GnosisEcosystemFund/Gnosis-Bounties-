@@ -150,6 +150,8 @@ contract('Buyback', (accounts) => {
     await buyBack.modifyTimeInterval(InitAccount, 10, {from: InitAccount});
   })
 
+  
+
   it("Should deposit tokens", async() => {
     await deposit();
   })
