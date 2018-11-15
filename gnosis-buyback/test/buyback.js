@@ -139,13 +139,16 @@ contract('Buyback', (accounts) => {
   })
 
   it("Should allow to modify sell token", async() => {
-  
+    await buyBack.modifySellToken(InitAccount, etherToken.address, {from: InitAccount});
   })
 
   it("Should allow to modify buy token", async() => {
-
+    await buyBack.modifyBuyToken(InitAccount, tokenGNO.address, {from: InitAccount});
   })
 
+  it("Should allow to modify time interval", async() => {
+    await buyBack.modifyTimeInterval(InitAccount, 10, {from: InitAccount});
+  })
 
   it("Should deposit tokens", async() => {
     await deposit();
