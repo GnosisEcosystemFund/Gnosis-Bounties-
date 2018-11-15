@@ -26,6 +26,12 @@ contract BuyBack {
     // mapping of the sell token to 
     mapping (address => mapping(address => uint)) internal balances;
 
+    // mapping of ether deposit to ether value
+    mapping(address => uint) internal etherBalance;
+
+    // mapping of user to tips
+    mapping(address => uint) internal tips;
+
     // mapping of auction index to dx index
     mapping(address => mapping(uint => uint)) internal dxAuctionIndexMap;
 
@@ -121,6 +127,17 @@ contract BuyBack {
         uint newSellerBalance
     );
 
+    event ModifyTip(
+        address indexed userAddress,
+        uint amount
+    );
+
+    event Tip(
+        address indexed userAddress,
+        address tippedAddress,
+        uint amount
+    );
+
     /**
      * @notice Buyback
      * @param _dx Address of the dutch exchange
@@ -170,6 +187,9 @@ contract BuyBack {
 
         // map user address to the buyback config
         buybacks[_userAddress] = buyback;
+        
+        // set default tip price
+        tips[_userAddress] = 1000000000 wei; // 
 
         // generate event
         emit AddBuyBack(
@@ -496,6 +516,10 @@ contract BuyBack {
 
         buybacks[_userAddress].lastTimeProcessed = now;
         buybacks[_userAddress].claimedLastSellOrder = false;
+        
+        // tip the user that poked the postSellOrder function
+        tip(_userAddress, msg.sender);
+
         emit PostSellOrder(_userAddress, buyToken, sellToken, balances[_userAddress][sellToken], amount, dxAuctionIndex);
     }
 
@@ -554,8 +578,9 @@ contract BuyBack {
             }
             
             emit ClaimWithdraw(sellToken, buyToken, balance, newBal);
-
         }
+        // set to true claimed sell order
+        buybacks[_userAddress].claimedLastSellOrder = true;
     }
 
      /**
@@ -604,5 +629,44 @@ contract BuyBack {
             _burnAddress,
             _amount
         );
+    }
+
+    /**
+     * @notice tip the user that pokes the postSellOrder function
+     */
+    function tip(address _userAddress, address _sender) internal returns(bool){
+        uint amount = tips[_userAddress];
+        uint balance = getEtherBalance(_userAddress);
+        bool result = false;
+        if(balance > amount && amount > 0){
+            etherBalance[_userAddress] -= amount;
+            result = _sender.send(amount);
+            emit Tip(_userAddress, _sender, amount);
+        }
+        return result;
+    }
+
+    /**
+     * @notice receive ether for compensation
+     */
+    function() external payable {
+        address userAddress = msg.sender;
+        etherBalance[userAddress] += msg.value;
+    }
+
+    /**
+     * @notice receive ether for compensation
+     */
+    function getEtherBalance(address _userAddress) public view returns(uint) {
+        return etherBalance[_userAddress];
+    }
+
+    /**
+     * @notice receive ether for compensation
+     * Can set tip to zero if you don't want to tip
+     */
+    function modifyTip(address _userAddress, uint _amount) public onlyOwner {
+        tips[_userAddress] = _amount;
+        emit ModifyTip(_userAddress, _amount);
     }
 }

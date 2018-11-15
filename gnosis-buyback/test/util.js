@@ -167,6 +167,7 @@ async function tryCatch(promise, message) {
 }
 
 module.exports = {
+    increaseTime,
     waitUntilPriceIsXPercentOfPreviousPrice,
     getAuctionIndex,
     takeSnapshot,

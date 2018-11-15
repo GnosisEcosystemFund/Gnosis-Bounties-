@@ -32,16 +32,23 @@ function truffleConfig ({
         host: urlDevelopment,
         port: portDevelopment,
         gas,
-        gasPrice,
+        gasPrice: 0x01,
         network_id: '*'
       },
       coverage: {
-        host: "localhost",
-        network_id: "*",
-        port: 8545,         // <-- If you change this, also set the port option in .solcover.js.
-        gas: 0xfffffffffff, // <-- Use this high gas value
-        gasPrice: 0x01      // <-- Use this low gas price
+        host: urlDevelopment,
+        port: portDevelopment,
+        gasPrice: 0x01,
+        gas,
+        network_id: '*'
       },
+      // coverage: {
+      //   host: "localhost",
+      //   network_id: "*",
+      //   port: 8545,         // <-- If you change this, also set the port option in .solcover.js.
+      //   gas: 0xfffffffffff, // <-- Use this high gas value
+      //   gasPrice: 0x01      // <-- Use this low gas price
+      // },
       mainnet: {
         provider: _getProvider(urlMainnet),
         network_id: '1',

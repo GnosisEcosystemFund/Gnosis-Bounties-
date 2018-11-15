@@ -16,6 +16,7 @@ const {
   takeSnapshot,
   revertToSnapshot,
   catchRevert,
+  increaseTime
 } = require('./util')
 
 contract('Buyback', (accounts) => {
@@ -51,11 +52,89 @@ contract('Buyback', (accounts) => {
     `)
   }
 
+  const approveAndDepositTradingAmounts = async () => {
+
+    await tokenGNO.approve(dx.address, 10e18, {from: SellerAccount})
+    await etherToken.approve(dx.address, 10e18, {from: SellerAccount})
+
+    await dx.deposit(tokenGNO.address, 10e18, {from: SellerAccount});
+    await dx.deposit(etherToken.address, 10e18, {from: SellerAccount});
+    await dx.addTokenPair(etherToken.address, tokenGNO.address, 2e18, 0, 2, 1, {from: SellerAccount})   
+  }
+
+
+  const tradeGNOETH = async() => {
+    const auctionIndex = (await dx.getAuctionIndex.call(etherToken.address, tokenGNO.address)).toNumber();
+    assert.equal(auctionIndex, 1, "Failed to create auction");
+
+    await waitUntilPriceIsXPercentOfPreviousPrice(dx, etherToken, tokenGNO, 1)
+    await dx.postBuyOrder(etherToken.address, tokenGNO.address, 1, 10e18,  {from: SellerAccount})
+
+    const auctionWasClosed = (auctionIndex + 1 === (await getAuctionIndex(dx, tokenGNO, etherToken)))
+    assert.equal(auctionWasClosed, true, "Failed to close auction error")
+  }
+
+  const performAuctionAndClaim = async() => {
+    const approve = await tokenGNO.approve(dx.address, 10e18, {from: SellerAccount})
+    // console.log({approve})
+
+    const etherApprove = await etherToken.approve(dx.address, 10e18, {from: SellerAccount})
+    // console.log({etherApprove})
+
+    const depositToken = await dx.deposit(tokenGNO.address, 10e18, {from: SellerAccount});
+    // console.log({depositToken})
+
+    const depositEther =  await dx.deposit(etherToken.address, 10e18, {from: SellerAccount});
+    // console.log({depositEther})
+
+    const tokenPair = await dx.addTokenPair(etherToken.address, tokenGNO.address, 2e18, 0, 2, 1, {from: SellerAccount})
+    // console.log({tokenPair})
+
+    const auctionIndex = (await dx.getAuctionIndex.call(etherToken.address, tokenGNO.address)).toNumber();
+    assert.equal(auctionIndex, 1, "Failed to create auction");
+    // console.log({auctionIndex})
+    // // create sell order
+    const result = await buyBack.getSellTokenBalance(InitAccount, {from: InitAccount})
+    // console.log(result.toNumber() / 1e18)
+
+    const sellOrder = await buyBack.postSellOrder(InitAccount, {from: InitAccount});
+
+    // console.log(sellOrder.logs[0])
+    // console.log('sellorder')
+    // console.log(sellOrder.logs[0].args.newSellerBalance.toNumber())
+
+
+    // let buyVolumes = (await dx.buyVolumes.call(etherToken.address, tokenGNO.address)).toNumber()
+    // let sellVolumes = (await dx.sellVolumesCurrent.call(etherToken.address, tokenGNO.address)).toNumber()
+
+    // console.log(`
+    // ----
+    // Current Buy Volume BEFORE Posting => ${buyVolumes}
+    // Current Sell Volume               => ${sellVolumes}
+    // ----
+    // `)
+    await waitUntilPriceIsXPercentOfPreviousPrice(dx, etherToken, tokenGNO, 1)
+    await dx.postBuyOrder(etherToken.address, tokenGNO.address, 1, 10e18,  {from: SellerAccount})
+
+    const auctionWasClosed = (auctionIndex + 1 === (await getAuctionIndex(dx, tokenGNO, etherToken)))
+    assert.equal(auctionWasClosed, true, "Failed to close auction error")
+
+    // const getBuyerBalance = (await dx.buyerBalances.call(etherToken.address, tokenGNO.address,  1, SellerAccount)).toNumber()
+    // console.log({getBuyerBalance})
+
+    // const getSellerBalance = (await dx.sellerBalances.call(etherToken.address, tokenGNO.address, 1, BuyBackAccount)).toNumber()
+    // console.log({getSellerBalance})
+
+    const claimFunds = await buyBack.claim(InitAccount, {from: InitAccount});
+    // console.log({claimFunds})
+  }
+
+
   let buyBack, InitAccount, BuyBackAccount ,SecondAccount, etherToken, dxProxy, dx, tokenGNO, SecondBurnAddress, priceOracleInterface, tokenFRT, owlProxy, snapId ;
 
-  InitAccount = accounts[0]
-  SellerAccount  = accounts[1]
-  BurnAddress    = accounts[2]
+  InitAccount       = accounts[0]
+  SellerAccount     = accounts[1]
+  BurnAddress       = accounts[2]
   SecondBurnAddress = accounts[3]
   WithdrawalAddress = accounts[4]
 
@@ -81,13 +160,19 @@ contract('Buyback', (accounts) => {
       ethUsdPrice: ${ethUsdPrice}
     `)
 
-    //takeSnapshot
+    // takeSnapshot
     snapId = await takeSnapshot();
   })
 
 
   it("Should add buyback", async() => {
     await buyBack.addBuyBack(InitAccount,  tokenGNO.address, etherToken.address, BurnAddress, true, [0,1], [1e18,1e18], 0, {from: InitAccount}); 
+  })
+
+  it("Should deposit ether into buyback", async() => {
+    await buyBack.sendTransaction({from: InitAccount, value: 10e18})
+    const balance = await buyBack.getEtherBalance.call(InitAccount);
+    assert.equal(balance, 10e18, "Failed to depos    it ether into contract");
   })
 
   it("Should allow to modify burn", async() => {
@@ -142,6 +227,11 @@ contract('Buyback', (accounts) => {
     await buyBack.modifySellToken(InitAccount, etherToken.address, {from: InitAccount});
   })
 
+  it("Should allow to modify tip price", async() => {
+    const tx = await buyBack.modifyTip(InitAccount, 10000000000, {from: InitAccount});
+    assert.equal(tx.logs[0].args.amount, 10000000000, "failed to modify tip price");
+  })
+
   it("Should allow to modify buy token", async() => {
     await buyBack.modifyBuyToken(InitAccount, tokenGNO.address, {from: InitAccount});
   })
@@ -149,8 +239,27 @@ contract('Buyback', (accounts) => {
   it("Should allow to modify time interval", async() => {
     await buyBack.modifyTimeInterval(InitAccount, 10, {from: InitAccount});
   })
-
   
+  it("Should allow to remove auction index", async() => {
+    await buyBack.removeAuctionIndex(InitAccount, 4, {from: InitAccount})
+    const indexes = (await buyBack.getAuctionIndexes.call(InitAccount));
+    assert.equal(indexes.length, 4, "Failed to modify auction indexes")
+
+  })
+
+  it("Should allow to remove auction indexes multi", async() => {
+    await buyBack.removeAuctionIndexMulti(InitAccount, [0,1], {from: InitAccount})
+    const indexes = (await buyBack.getAuctionIndexes.call(InitAccount));
+    assert.equal(indexes.length, 2, "Failed to modify auction indexes")
+    console.log(indexes[0].toNumber())
+    console.log(indexes[1].toNumber())
+  })
+
+  it("Should prevent modify auction index multi with empty array length", async() => {
+    catchRevert(
+      buyBack.removeAuctionIndexMulti(InitAccount, [], {from: InitAccount})
+    )
+  })
 
   it("Should deposit tokens", async() => {
     await deposit();
@@ -174,108 +283,111 @@ contract('Buyback', (accounts) => {
 
   it("Should allow to pariticipate in dutchx auction, claim funds & burn it to an address", async() => {
     await revertToSnapshot(snapId) // revert to the snapshot
+    snapId = await takeSnapshot();
 
+    const currentBal = (await tokenGNO.balanceOf.call(BurnAddress)).toNumber()
     // add buyback
-    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, BurnAddress, true, [0,0], [1e18,1e18], 0, {from: InitAccount}); 
-
-
+    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, BurnAddress, true, [0], [1e18], 0, {from: InitAccount}); 
     // deposit tokens
     await deposit();
+    await performAuctionAndClaim();
 
-    
-    const approve = await tokenGNO.approve(dx.address, 10e18, {from: SellerAccount})
-    console.log({approve})
+    // check burn address for balance
+    const burnBalance = (await tokenGNO.balanceOf.call(BurnAddress)).toNumber()
+    assert.equal(burnBalance > currentBal, true, "Failed to burn withdrawn tokens");
+    // check balance of address
+  })
 
-    const etherApprove = await etherToken.approve(dx.address, 10e18, {from: SellerAccount})
-    console.log({etherApprove})
+  it("Should be able to claim funds and burn it without address", async() => {
+    await revertToSnapshot(snapId) // revert to the snapshot
+    snapId = await takeSnapshot();
 
-    const depositToken = await dx.deposit(tokenGNO.address, 10e18, {from: SellerAccount});
-    console.log({depositToken})
-
-    const depositEther =  await dx.deposit(etherToken.address, 10e18, {from: SellerAccount});
-    console.log({depositEther})
-
-    const tokenPair = await dx.addTokenPair(etherToken.address, tokenGNO.address, 2e18, 0, 2, 1, {from: SellerAccount})
-    console.log({tokenPair})
-
-    const auctionIndex = (await dx.getAuctionIndex.call(etherToken.address, tokenGNO.address)).toNumber();
-    console.log({auctionIndex})
-
-    // // create sell order
-
-    const result = await buyBack.getSellTokenBalance(InitAccount, {from: InitAccount})
-    console.log(result.toNumber() / 1e18)
-
-    const sellOrder = await buyBack.postSellOrder(InitAccount, {from: InitAccount});
-
-    console.log(sellOrder.logs[0])
-    console.log('sellorder')
-    console.log(sellOrder.logs[0].args.newSellerBalance.toNumber())
-
-
-    let buyVolumes = (await dx.buyVolumes.call(etherToken.address, tokenGNO.address)).toNumber()
-    let sellVolumes = (await dx.sellVolumesCurrent.call(etherToken.address, tokenGNO.address)).toNumber()
-
-    console.log(`
-    ----
-    Current Buy Volume BEFORE Posting => ${buyVolumes}
-    Current Sell Volume               => ${sellVolumes}
-    ----
-    `)
-
-    await waitUntilPriceIsXPercentOfPreviousPrice(dx, etherToken, tokenGNO, 1)
-
-    const buyOrder = await dx.postBuyOrder(etherToken.address, tokenGNO.address, 1, 10e18,  {from: SellerAccount})
-    console.log({buyOrder})
-    // const buyOrder1 = await dx.postBuyOrder(etherToken.address, tokenGNO.address, 1, 2e18,  {from: SellerAccount})
-    // console.log({buyOrder1})
-
-
-    console.log('balance of seller', (await dx.balances.call(tokenGNO.address, SellerAccount)).toNumber())
-
-    
-  //   // const startAuction = await dx.getAuctionStart.call(tokenGNO.address, etherToken.address, {from: BuyBackAccount});
-  //   // console.log({startAuction})
-    
-  //   //
-    console.log("auction index")
-    console.log(await getAuctionIndex(dx, tokenGNO, etherToken))
-    const auctionWasClosed = (auctionIndex + 1 === (await getAuctionIndex(dx, tokenGNO, etherToken)))
-    console.log({auctionWasClosed})
-
-    const getBuyerBalance = (await dx.buyerBalances.call(etherToken.address, tokenGNO.address,  1, SellerAccount)).toNumber()
-    console.log({getBuyerBalance})
-
-    const getSellerBalance = (await dx.sellerBalances.call(etherToken.address, tokenGNO.address, 1, BuyBackAccount)).toNumber()
-    console.log({getSellerBalance})
-
-  //   const second = await buyBack.getSellTokenBalance.call({from: BuyBackAccount})
-  //   console.log(second.toNumber() / 1e18)
-
-   buyVolumes = (await dx.buyVolumes.call(etherToken.address, tokenGNO.address))
-     sellVolumes = (await dx.sellVolumesCurrent.call(etherToken.address, tokenGNO.address))
-
-    console.log(`
-    ----
-    Current Buy Volume BEFORE Posting => ${buyVolumes}
-    Current Sell Volume               => ${sellVolumes}
-    ----
-    `)
-
-    const claimFunds = await buyBack.claim(InitAccount, {from: InitAccount});
-    console.log({claimFunds})
+    // add buyback
+    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, null, false, [0], [1e18], 0, {from: InitAccount}); 
+    // deposit tokens
+    await deposit();
+    await performAuctionAndClaim();
 
     // check burn address for balance
     const burnBalance = (await tokenGNO.balanceOf.call(BurnAddress)).toNumber()
     console.log({burnBalance})
-      // const cliam = await buyBack.
+  })
 
+  it("Should prevent being able to call poke perform if time period hasn't passed", async() => {
+    await revertToSnapshot(snapId) // revert to the snapshot
+    snapId = await takeSnapshot();
+
+    // add buyback
+    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, null, false, [0], [1e18], 0, {from: InitAccount});
+
+    // deposit tokens
+    await deposit();
+
+    await approveAndDepositTradingAmounts();
+    await buyBack.postSellOrder(InitAccount, {from: InitAccount});
+
+    await catchRevert(
+      buyBack.postSellOrder(InitAccount, {from: InitAccount})
+    )
+  })
+
+  it("Should be able to claim poke perform auction within time period intervals", async() => {
+    await revertToSnapshot(snapId) // revert to the snapshot
+    snapId = await takeSnapshot();
+
+    let wait = 10;
+
+    // add buyback
+    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, null, false, [0], [1e18], wait, {from: InitAccount}); 
+    // deposit tokens
+    await deposit();
     
-    // await revertToSnapshot(snap_id)
-  })
+    await approveAndDepositTradingAmounts();
 
-  it("Should be able to claim funds and burn it", async() => {
+    const bal = (await buyBack.getSellTokenBalance.call(InitAccount, {from: InitAccount})).toNumber()
+    assert.equal(bal, 40e18, "Failed to deposit tokens")
+    console.log({bal})
+    
+    await buyBack.postSellOrder(InitAccount, {from: InitAccount});
+    console.log("buyback solding")
+    
+    await tradeGNOETH();
 
-  })
+    await buyBack.claim(InitAccount, {from: InitAccount});
 
+    await increaseTime(wait)
+    console.log("increased time working")
+
+    const bal2 = (await buyBack.getSellTokenBalance.call(InitAccount, {from: InitAccount})).toNumber()
+    console.log(bal2/10e18)
+
+    await buyBack.postSellOrder(InitAccount, {from: InitAccount});
+    console.log("designed by luck working in power")
+
+  });
+
+  it("Should prevent posting a new sell order if previous sell order hasn't been claimed", async() => {
+    await revertToSnapshot(snapId) // revert to the snapshot
+    snapId = await takeSnapshot();
+
+    let wait = 10;
+    // add buyback
+    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, null, false, [0], [1e18], wait, {from: InitAccount}); 
+    // deposit tokens
+    await deposit();
+    
+    await approveAndDepositTradingAmounts();
+
+    const bal = (await buyBack.getSellTokenBalance.call(InitAccount, {from: InitAccount})).toNumber()
+    assert.equal(bal, 40e18, "Failed to deposit tokens")
+    
+    await buyBack.postSellOrder(InitAccount, {from: InitAccount});    
+    await tradeGNOETH();
+
+    await increaseTime(wait)
+
+    catchRevert(
+      buyBack.postSellOrder(InitAccount, {from: InitAccount})
+    )
+  });
 })

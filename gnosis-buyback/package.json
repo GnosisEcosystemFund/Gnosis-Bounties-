@@ -14,6 +14,7 @@
   },
   "devDependencies": {
     "@digix/tempo": "^0.2.0",
+    "coveralls": "^3.0.2",
     "eslint-config-standard": "^12.0.0",
     "ganache-cli": "^6.1.8",
     "solidity-coverage": "^0.5.11",
