@@ -258,7 +258,6 @@ contract('Buyback', (accounts) => {
     await revertToSnapshot(snapId) // revert to the snapshot
     snapId = await takeSnapshot();
 
-    const currentBal = (await tokenGNO.balanceOf.call(BurnAddress)).toNumber()
     // add buyback
     await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, BurnAddress, true, [0], [1e18], 0, true, {from: InitAccount}); 
     // deposit tokens
@@ -283,7 +282,7 @@ contract('Buyback', (accounts) => {
 
   })
 
-  it("Should prevent being able to call poke perform if time period hasn't passed", async() => {
+  it("Should prevent being able to call postSellOrder if time period hasn't passed", async() => {
     await revertToSnapshot(snapId) // revert to the snapshot
     snapId = await takeSnapshot();
 
@@ -301,7 +300,7 @@ contract('Buyback', (accounts) => {
     )
   })
 
-  it("Should be able to claim poke perform auction within time period intervals", async() => {
+  it("Should be able to postSellOrder after timeinterval has elapsed & previous order has been claimed", async() => {
     await revertToSnapshot(snapId) // revert to the snapshot
     snapId = await takeSnapshot();
 
