@@ -232,7 +232,7 @@ contract BuyBack {
     }
 
     /**
-     * @notice modifyAuctionAmountMulti modify the amount for multiple auction index
+     * @notice modifyAuctionIndexMulti
      * @param _userAddress User addresss
      * @param _auctionIndexes Auction index the to participate 
      * @param _auctionAmounts Auction amount to fill in auction index
@@ -247,7 +247,7 @@ contract BuyBack {
     }
 
     /**
-     * @notice modifyAuctionIndex modify the amount for an auction index
+     * @notice modifyAuctionIndex
      * @param _userAddress User addresss
      * @param _auctionIndex Auction index the to participate 
      * @param _auctionAmount Auction amount to fill in auction index
@@ -262,7 +262,7 @@ contract BuyBack {
     }
 
     /**
-     * @notice modifyAuctionIndex modify the amount for an auction index
+     * @notice modifySellToken
      * @param _userAddress User addresss
      * @param _sellToken Address of the sell token
      */
@@ -276,7 +276,7 @@ contract BuyBack {
     }
 
     /**
-     * @notice modifyAuctionIndex modify the amount for an auction index
+     * @notice modifyBuyToken
      * @param _userAddress User addresss
      * @param _buyToken Address of the buy token
      */
@@ -290,7 +290,7 @@ contract BuyBack {
     }
 
     /**
-     * @notice modifyAuctionIndex modify the amount for an auction index
+     * @notice modifyTimeInterval
      * @param _userAddress User addresss
      */
     function modifyTimeInterval(address _userAddress, uint _timeInterval) public onlyOwner {
@@ -301,7 +301,7 @@ contract BuyBack {
     }
 
     /**
-     * @notice getAuctions fetch all the available auctions
+     * @notice getAuctionIndexes
      * @param _userAddress User addresss
      */    
     function getAuctionIndexes(address _userAddress) public view returns (uint[]){
@@ -318,7 +318,7 @@ contract BuyBack {
     }
 
     /**
-     * @notice removeAuction
+     * @notice removeAuctionIndex
      * @param _userAddress User addresss
      * @param _index The index in array auctionIndexes of the auctionIndex to delete
      */
@@ -351,7 +351,7 @@ contract BuyBack {
     
     
     /**
-     * @notice deleteAuctionIndexs delete an Auction
+     * @notice removeAuctionIndexMulti
      * @param _userAddress User addresss
      * @param _indexes indexes of the auction in array
      */
@@ -364,7 +364,7 @@ contract BuyBack {
     }
 
     /**
-     * @notice deleteAuctionIndexs delete an Auction
+     * @notice removeBuyBack
      * @param _userAddress User addresss
      */
     function removeBuyBack(address _userAddress) public onlyOwner {
@@ -427,7 +427,7 @@ contract BuyBack {
     }
 
     /**
-     * @notice getSellBalance
+     * @notice getSellTokenBalance
      * @param _userAddress User addresss
      */
     function getSellTokenBalance(address _userAddress) public view returns (uint) {
@@ -436,7 +436,7 @@ contract BuyBack {
     }
 
     /**
-     * @notice getSellBalance
+     * @notice getTokenBalance
      * @param _userAddress User addresss
      * @param _tokenAddress User addresss
      */
@@ -471,7 +471,7 @@ contract BuyBack {
     }
 
     /**
-    * @notice depositDutchx depsoit to dutchx contract
+    * @notice depositDutchx deposit to dutchx contract
      * @param _sellToken Address of the sell token
      * @param _amount Address of the sell token
     */  
@@ -581,7 +581,7 @@ contract BuyBack {
     }
 
      /**
-     * @notice approve trading
+     * @notice withdraw
      * @param _userAddress User addresss
      */
     function withdraw(address _userAddress, address _tokenAddress, address _toAddress, uint _amount) external {
@@ -592,7 +592,6 @@ contract BuyBack {
         balances[_userAddress][_tokenAddress] -= _amount;
         require(Token(_tokenAddress).transfer(_toAddress, _amount));
         emit Withdraw(_tokenAddress, _amount, balances[_userAddress][_tokenAddress]);
-
     }
 
     /**
