@@ -53,7 +53,7 @@ const waitUntilPriceIsXPercentOfPreviousPrice = async (dx, ST, BT, p) => {
   
     const currentIndex = getAuctionIndex.toNumber()
     const startingTimeOfAuction = getAuctionStart.toNumber()
-    console.log({startingTimeOfAuction})
+
     let priceBefore = 1
     if (!silent) {
       let [num, den] = (await dx.getCurrentAuctionPrice.call(ST.address, BT.address, currentIndex))
@@ -69,13 +69,12 @@ const waitUntilPriceIsXPercentOfPreviousPrice = async (dx, ST, BT, p) => {
     }
   
     const timeToWaitFor = Math.ceil((86400 - p * 43200) / (1 + p)) + startingTimeOfAuction
-    console.log({timeToWaitFor})
     // wait until the price is good
     // let 
-    console.log(await timestamp())
-    console.log(timeToWaitFor - await timestamp())
+    // console.log(await timestamp())
+    // console.log(timeToWaitFor - await timestamp())
     await increaseTime(timeToWaitFor - await timestamp());
-    console.log(await timestamp())
+    // console.log(await timestamp())
 
   
     if (!silent) {
@@ -123,7 +122,6 @@ const waitUntilPriceIsXPercentOfPreviousPrice = async (dx, ST, BT, p) => {
 }
 
 function revertToSnapshot(snapShotId) {
-    console.log("reverting")
     return new Promise((resolve, reject) => {
         web3.currentProvider.sendAsync(
             {

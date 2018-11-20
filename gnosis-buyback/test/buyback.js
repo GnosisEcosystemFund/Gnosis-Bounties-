@@ -105,7 +105,6 @@ contract('Buyback', (accounts) => {
   before ( async() => {
     buyBack = await Buyback.deployed()
     BuyBackAccount = buyBack.address
-    console.log({BuyBackAccount})
 
     const dxAddress = await buyBack.dx.call()
 
@@ -221,8 +220,6 @@ contract('Buyback', (accounts) => {
     await buyBack.removeAuctionIndexMulti(InitAccount, [0,1], {from: InitAccount})
     const indexes = (await buyBack.getAuctionIndexes.call(InitAccount));
     assert.equal(indexes.length, 2, "Failed to modify auction indexes")
-    console.log(indexes[0].toNumber())
-    console.log(indexes[1].toNumber())
   })
 
   it("Should prevent modify auction index multi with empty array length", async() => {
@@ -278,9 +275,6 @@ contract('Buyback', (accounts) => {
     await deposit();
     await performAuctionAndClaim();
 
-    // check burn address for balance
-    const burnBalance = (await tokenGNO.balanceOf.call(BurnAddress)).toNumber()
-    console.log({burnBalance})
   })
 
   it("Should prevent being able to call poke perform if time period hasn't passed", async() => {
@@ -316,23 +310,16 @@ contract('Buyback', (accounts) => {
 
     const bal = (await buyBack.getSellTokenBalance.call(InitAccount, {from: InitAccount})).toNumber()
     assert.equal(bal, 40e18, "Failed to deposit tokens")
-    console.log({bal})
     
     await buyBack.postSellOrder(InitAccount, {from: InitAccount});
-    console.log("buyback solding")
     
     await tradeGNOETH();
 
     await buyBack.claim(InitAccount, {from: InitAccount});
 
     await increaseTime(wait)
-    console.log("increased time working")
-
-    const bal2 = (await buyBack.getSellTokenBalance.call(InitAccount, {from: InitAccount})).toNumber()
-    console.log(bal2/10e18)
 
     await buyBack.postSellOrder(InitAccount, {from: InitAccount});
-    console.log("designed by luck working in power")
 
   });
 
