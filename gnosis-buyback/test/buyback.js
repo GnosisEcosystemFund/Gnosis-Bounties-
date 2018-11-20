@@ -258,6 +258,8 @@ contract('Buyback', (accounts) => {
     await revertToSnapshot(snapId) // revert to the snapshot
     snapId = await takeSnapshot();
 
+    const currentBal = (await tokenGNO.balanceOf.call(BurnAddress)).toNumber()
+
     // add buyback
     await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, BurnAddress, true, [0], [1e18], 0, true, {from: InitAccount}); 
     // deposit tokens
@@ -279,7 +281,23 @@ contract('Buyback', (accounts) => {
     // deposit tokens
     await deposit();
     await performAuctionAndClaim();
+  })
 
+  it("Should prevent posting calling postSellOrder if external poke is false", async() => {
+    await revertToSnapshot(snapId) // revert to the snapshot
+    snapId = await takeSnapshot();
+
+    // add buyback
+    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, null, false, [0], [1e18], 0, false, {from: InitAccount});
+
+    // deposit tokens
+    await deposit();
+
+    await approveAndDepositTradingAmounts();
+
+    await catchRevert(
+      buyBack.postSellOrder(InitAccount, {from: SellerAccount})
+    )  
   })
 
   it("Should prevent being able to call postSellOrder if time period hasn't passed", async() => {
