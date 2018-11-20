@@ -11,13 +11,11 @@ contract BuyBack {
 
     // mapping user address to sell token & buytoken with burn address
     struct Buyback {
-        // ellToken the token that is sold
         address sellToken;
         address buyToken;
         address burnAddress;
         bool shouldBurnToken;
         uint[] auctionIndexes; // This is a mapping of auction id to amount
-        // uint[] auctionAmounts;
         uint minTimeInterval; // time interval between poking in seconds
         uint lastTimeProcessed;
         bool claimedLastSellOrder;
