@@ -6,15 +6,6 @@ What is a token buybacks? In traditional finance it relates to share repurchases
 
 The smart contract has customizable parameters to enable projects to easily perform the token buyback through the DutchX. It allows the specification of the the following parameters:
 
-        address _userAddress,
-        address _buyToken,
-        address _sellToken, 
-        address _burnAddress, 
-        bool _burn, 
-        uint[] _auctionIndexes, 
-        uint[] _auctionAmounts,
-        uint _timeInterval
-
 [-] ERC20 Token used as sellToken (deposited into the auction)
 [-] ERC20 Token that is bought back (buyToken)
 [-] Specific auction(s) (by index) the buy back should take place (the amount of auctions should be modifiable)
@@ -24,7 +15,6 @@ The smart contract has customizable parameters to enable projects to easily perf
 [-] Auction Indices & amounts to pariticipate
 [-] Minimum Time interval between executing token buybacks (Optional) 
 [-] Includes a possibilty for any party to trigger this function (anyone who has an incentive may then do so and will have to spend the gas). Gives Ether to the one who pokes to compensate for gas cost spent.
-
 
 ## Install
 ### Install requirements with npm:
@@ -37,6 +27,3 @@ npm install
 $ truffle compile
 $ truffle test
 ```
-
-## How it Works
-
