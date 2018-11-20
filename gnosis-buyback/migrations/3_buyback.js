@@ -5,7 +5,6 @@ const GNOToken = artifacts.require("TokenGNO")
 
 
 module.exports = function(deployer, network, accounts) {
-    const BurnAddress = accounts[2]
 
     let dxProxy, etherToken, gnoToken
     console.log("working on deploying")

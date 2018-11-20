@@ -32,13 +32,13 @@ function truffleConfig ({
         host: urlDevelopment,
         port: portDevelopment,
         gas,
-        gasPrice: 0x01,
+        gasPrice,
         network_id: '*'
       },
       coverage: {
         host: urlDevelopment,
         port: portDevelopment,
-        gasPrice: 0x01,
+        gasPrice,
         gas,
         network_id: '*'
       },

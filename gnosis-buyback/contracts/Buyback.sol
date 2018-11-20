@@ -225,7 +225,6 @@ contract BuyBack {
     function modifyAuctionAmount(address _userAddress, uint _auctionIndex, uint _auctionAmount) public onlyOwner {
         require(_auctionAmount > 0);
         // checks if the auction index exists
-        // require(buybacks[_userAddress].auctionAmounts[_index] > 0);
         require(auction[_userAddress][_auctionIndex] > 0);
 
         auction[_userAddress][_auctionIndex] = _auctionAmount;
