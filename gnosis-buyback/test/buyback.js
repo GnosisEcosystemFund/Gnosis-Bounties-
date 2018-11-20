@@ -129,17 +129,23 @@ contract('Buyback', (accounts) => {
 
 
   it("Should add buyback", async() => {
-    await buyBack.addBuyBack(InitAccount,  tokenGNO.address, etherToken.address, BurnAddress, true, [0,1], [1e18,1e18], 0, {from: InitAccount}); 
+    const tx = await buyBack.addBuyBack(InitAccount,  tokenGNO.address, etherToken.address, BurnAddress, true, [0,1], [1e18,1e18], 0, true,{from: InitAccount}); 
+    assert.equal(tx.logs[0].args.userAddress, InitAccount, "failed to add buyback");
   })
 
   it("Should deposit ether into buyback", async() => {
     await buyBack.sendTransaction({from: InitAccount, value: 10e18})
     const balance = await buyBack.getEtherBalance.call(InitAccount);
-    assert.equal(balance, 10e18, "Failed to depos    it ether into contract");
+    assert.equal(balance, 10e18, "Failed to deposit ether into contract");
   })
 
   it("Should allow to modify burn", async() => {
     await buyBack.modifyBurn(InitAccount, false, {from: InitAccount});
+  });
+
+  it("Should allow to modify poke", async() => {
+    const tx = await buyBack.modifyExternalPoke(InitAccount, false, {from: InitAccount});
+    assert.equal(tx.logs[0].args.allowExternalPoke, false, "failed to modify external poke");
   });
 
   it("Should allow to modify burn address", async() => {
@@ -254,7 +260,7 @@ contract('Buyback', (accounts) => {
 
     const currentBal = (await tokenGNO.balanceOf.call(BurnAddress)).toNumber()
     // add buyback
-    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, BurnAddress, true, [0], [1e18], 0, {from: InitAccount}); 
+    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, BurnAddress, true, [0], [1e18], 0, true, {from: InitAccount}); 
     // deposit tokens
     await deposit();
     await performAuctionAndClaim();
@@ -270,7 +276,7 @@ contract('Buyback', (accounts) => {
     snapId = await takeSnapshot();
 
     // add buyback
-    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, null, false, [0], [1e18], 0, {from: InitAccount}); 
+    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, null, false, [0], [1e18], 0, true, {from: InitAccount}); 
     // deposit tokens
     await deposit();
     await performAuctionAndClaim();
@@ -282,7 +288,7 @@ contract('Buyback', (accounts) => {
     snapId = await takeSnapshot();
 
     // add buyback
-    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, null, false, [0], [1e18], 0, {from: InitAccount});
+    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, null, false, [0], [1e18], 0, true, {from: InitAccount});
 
     // deposit tokens
     await deposit();
@@ -302,7 +308,7 @@ contract('Buyback', (accounts) => {
     let wait = 10;
 
     // add buyback
-    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, null, false, [0], [1e18], wait, {from: InitAccount}); 
+    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, null, false, [0], [1e18], wait, true, {from: InitAccount}); 
     // deposit tokens
     await deposit();
     
@@ -329,7 +335,7 @@ contract('Buyback', (accounts) => {
 
     let wait = 10;
     // add buyback
-    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, null, false, [0], [1e18], wait, {from: InitAccount}); 
+    await buyBack.addBuyBack(InitAccount, tokenGNO.address, etherToken.address, null, false, [0], [1e18], wait, true, {from: InitAccount}); 
     // deposit tokens
     await deposit();
     

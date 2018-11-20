@@ -8,13 +8,12 @@ The smart contract has customizable parameters to enable projects to easily perf
 
 - ERC20 Token used as sellToken (deposited into the auction)
 - ERC20 Token that is bought back (buyToken)
-- Specific auction(s) (by index) the buy back should take place (the amount of auctions should be modifiable)
-- How much sell funds are committed in which auction index (amounts should be modifiable and not necessarily the same amounts through each auction).
+- Specific auction(s) (by index) with amount where the buy back should take place (the amount of auctions is modifiable)
+- How much sell funds are committed in which auction index (amounts are modifiable and not necessarily the same amounts through each auction).
 - Burn possibility to the receipt token (once it’s claimed and withdrawn) (Optional).
-- Burn Address ( Optional) but highly recommended to include how the smart contract is triggered to perform the needed transaction
-- Auction Indices & amounts to pariticipate
+- Burn Address (Optional) address to send burnt tokens to
 - Minimum Time interval between executing token buybacks (Optional) 
-- Includes a possibilty for any party to trigger this function (anyone who has an incentive may then do so and will have to spend the gas). Gives Ether to the one who pokes to compensate for gas cost spent.
+- Includes a possibilty for any party to trigger sell order and gives ether to the one who pokes to compensate for gas cost spent. (amount of ether tipped also modifiable)
 
 ## Install
 ### Install requirements with npm:

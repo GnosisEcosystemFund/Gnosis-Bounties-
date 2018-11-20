@@ -19,6 +19,7 @@ contract BuyBack {
         uint minTimeInterval; // time interval between poking in seconds
         uint lastTimeProcessed;
         bool claimedLastSellOrder;
+        bool allowExternalPoke;
     }
 
     // mapping of the sell token to 
@@ -136,6 +137,11 @@ contract BuyBack {
         uint amount
     );
 
+    event ModifyExternalPoke(
+        address indexed userAddress,
+        bool allowExternalPoke
+    );
+
     /**
      * @notice Buyback
      * @param _dx Address of the dutch exchange
@@ -156,6 +162,7 @@ contract BuyBack {
      * @param _auctionIndexes Auction indexes the to participate 
      * @param _auctionAmounts Auction amounts to fill in each auction index
      * @param _timeInterval Minimum time passed between buyback execution
+     * @param _allowExternalPoke allow external users to poke 
     */
     function addBuyBack(
         address _userAddress,
@@ -165,7 +172,8 @@ contract BuyBack {
         bool _burn, 
         uint[] _auctionIndexes, 
         uint[] _auctionAmounts,
-        uint _timeInterval
+        uint _timeInterval,
+        bool _allowExternalPoke
         ) public {
 
         require(address(_userAddress) != address(0));
@@ -181,7 +189,7 @@ contract BuyBack {
             auction[_userAddress][_auctionIndexes[i]] = _auctionAmounts[i];
         }
 
-        Buyback memory buyback = Buyback(_sellToken, _buyToken, _burnAddress, _burn, _auctionIndexes, _timeInterval, 0, true);
+        Buyback memory buyback = Buyback(_sellToken, _buyToken, _burnAddress, _burn, _auctionIndexes, _timeInterval, 0, true, _allowExternalPoke);
 
         // map user address to the buyback config
         buybacks[_userAddress] = buyback;
@@ -494,6 +502,11 @@ contract BuyBack {
         address sellToken = buybacks[_userAddress].sellToken;
         address buyToken = buybacks[_userAddress].buyToken;
 
+        bool allowExternalPoke = buybacks[_userAddress].allowExternalPoke;
+        if(allowExternalPoke == false){
+            require(msg.sender == owner);
+        }
+
         require(isTimePassed(_userAddress) == true); // ensure the min time has passed
         require(claimedLastOrder(_userAddress) == true); // ensure the previous order has been claimed or burnt
         
@@ -651,10 +664,20 @@ contract BuyBack {
     }
 
     /**
-     * @notice receive ether for compensation
+     * @notice getEtherBalance
      */
     function getEtherBalance(address _userAddress) public view returns(uint) {
         return etherBalance[_userAddress];
+    }
+
+    /**
+     * @notice modifyExternalPoke
+     * @param _userAddress Address of user
+     * @param _allowExternalPoke bool externalPoke
+     */
+    function modifyExternalPoke(address _userAddress, bool _allowExternalPoke) public onlyOwner {
+        buybacks[_userAddress].allowExternalPoke = _allowExternalPoke;
+        emit ModifyExternalPoke(_userAddress, _allowExternalPoke);
     }
 
     /**
