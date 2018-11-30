@@ -26,7 +26,41 @@ npm install
 $ npm test
 ```
 
+
+### Steps
+- . Deploy the contract
+- . Add buyback confiugration via the `addBuyBack` function. This allows you specify the auctionIndexes & amounts to participate in auctions. An optional time interval between executing buybacks. 
+    - *_userAddress* This is the address of the user that owns the buyBack config
+    - *_buyToken*
+    - *_sellToken* 
+    - *_burnAddress*
+    - *_burn* 
+    - *_auctionIndexes*
+    - *_auctionAmounts*
+    - *_timeInterval*
+    - *_allowExternalPoke*
+    - *tipAmount*
+
+
+
+### Functions
+
+#### addBuyback
+```js
+function addBuyBack(
+        address _userAddress,
+        address _buyToken,
+        address _sellToken, 
+        address _burnAddress, 
+        bool _burn, 
+        uint[] _auctionIndexes, 
+        uint[] _auctionAmounts,
+        uint _timeInterval,
+        bool _allowExternalPoke,
+        uint tipAmount
+)
+```
+
+
+
 ### Example Use Case
-
-
-

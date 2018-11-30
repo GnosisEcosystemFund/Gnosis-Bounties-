@@ -381,10 +381,12 @@ contract BuyBack {
     function removeBuyBack(address _userAddress) public onlyOwner {
         require(buybacks[_userAddress].auctionIndexes.length > 0);
 
+        Buyback memory userBuyback = buybacks[_userAddress];
+
         // remove all auction indexes 
-        uint[] auctionIndexes = buybacks[_userAddress].auctionIndexes;
-        address sellToken = buybacks[_userAddress].sellToken;
-        address buyToken = buybacks[_userAddress].buyToken;
+        uint[] memory auctionIndexes = userBuyback.auctionIndexes;
+        address sellToken = userBuyback.sellToken;
+        address buyToken = userBuyback.buyToken;
 
         require(balances[_userAddress][sellToken] == 0); // ensure all withdrawal is made
         require(balances[_userAddress][buyToken] == 0); // ensure all withdrawal is made
