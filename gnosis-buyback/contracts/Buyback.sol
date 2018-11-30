@@ -6,10 +6,10 @@ import "@gnosis.pm/dx-contracts/contracts/Oracle/PriceOracleInterface.sol";
 
 contract BuyBack {
 
-    address owner;    
-    address dutchXAddress;
+    address owner;
+    DutchExchange public dx;
 
-    // mapping user address to sell token & buytoken with burn address
+    // Buyback config
     struct Buyback {
         address sellToken;
         address buyToken;
@@ -19,33 +19,30 @@ contract BuyBack {
         uint minTimeInterval; // time interval between poking in seconds
         uint lastTimeProcessed;
         bool claimedLastSellOrder;
-        bool allowExternalPoke;
+        bool allowExternalPoke; // allow an external person to call postSellOrder
     }
 
-    // mapping of the sell token to 
+    // mapping of the user address to token addresses & balance
     mapping (address => mapping(address => uint)) internal balances;
 
-    // mapping of ether deposit to ether value
+    // mapping of user address to ether deposit value
     mapping(address => uint) internal etherBalance;
 
-    // mapping of user to tips
+    // mapping of user address to tip amount
     mapping(address => uint) internal tips;
 
-    // mapping of auction index to dx index
-    mapping(address => mapping(uint => uint)) internal dxAuctionIndexMap;
+    // mapping of user address to auction index to ductchx index for the auction index participated in
+    mapping(address => mapping(uint => uint)) internal dxAuctionIndex;
 
     // maps user address to buyback config
     mapping(address => Buyback) buybacks;
     
-    // mapping of useraddress to auction index
-    mapping(address => mapping(uint => uint)) internal auction;
+    // mapping of user address to auction index and auction amount
+    mapping(address => mapping(uint => uint)) internal auctionIndexWithAmount;
 
-    // mapping of a auction id to wether
-    // we currently participating in an auction for
-    // the auction id
+    // mapping of user address to auction id to whether an auction has been clamied
     mapping(address => mapping(uint => bool)) internal alreadyClaimed;
 
-    DutchExchange public dx;
 
     modifier onlyOwner () {
         require(msg.sender == owner);
@@ -143,13 +140,12 @@ contract BuyBack {
     );
 
     /**
-     * @notice Buyback
+     * @notice Create the buyback contract
      * @param _dx Address of the dutch exchange
      */
     function BuyBack(address _dx) public {
         require(address(_dx) != address(0));
         dx = DutchExchange(_dx);
-        dutchXAddress = _dx;
         owner = msg.sender;
     }
        
@@ -158,11 +154,11 @@ contract BuyBack {
      * @param _userAddress Address of the user 
      * @param _buyToken Address of the buy token
      * @param _sellToken Address of the sell token
-     * @param _burn Should burn the token after buy back success
+     * @param _burn Burn the token after buy back success
      * @param _auctionIndexes Auction indexes the to participate 
-     * @param _auctionAmounts Auction amounts to fill in each auction index
+     * @param _auctionAmounts Amounts to participate in each realtive auction index
      * @param _timeInterval Minimum time passed between buyback execution
-     * @param _allowExternalPoke allow external users to poke 
+     * @param _allowExternalPoke Allow non owners to call postSellOrder
     */
     function addBuyBack(
         address _userAddress,
@@ -173,7 +169,8 @@ contract BuyBack {
         uint[] _auctionIndexes, 
         uint[] _auctionAmounts,
         uint _timeInterval,
-        bool _allowExternalPoke
+        bool _allowExternalPoke,
+        uint tipAmount
         ) public {
 
         require(address(_userAddress) != address(0));
@@ -186,18 +183,24 @@ contract BuyBack {
         // // map the auction ids to the auction amount
         for(uint i = 0; i < _auctionIndexes.length; i++){
             require(_auctionAmounts[i] > 0); // ensure the auction amount is greater than zero
-            auction[_userAddress][_auctionIndexes[i]] = _auctionAmounts[i];
+            auctionIndexWithAmount[_userAddress][_auctionIndexes[i]] = _auctionAmounts[i];
         }
 
-        Buyback memory buyback = Buyback(_sellToken, _buyToken, _burnAddress, _burn, _auctionIndexes, _timeInterval, 0, true, _allowExternalPoke);
+        Buyback memory buyback = Buyback(
+            _sellToken, 
+            _buyToken, 
+            _burnAddress,
+            _burn, 
+            _auctionIndexes, 
+            _timeInterval, 0, true, 
+            _allowExternalPoke );
 
         // map user address to the buyback config
         buybacks[_userAddress] = buyback;
         
-        // set default tip price
-        tips[_userAddress] = 1000000000 wei; // 
+        // set tip price
+        tips[_userAddress] = tipAmount; 
 
-        // generate event
         emit AddBuyBack(
             _userAddress,
             _buyToken,
@@ -210,7 +213,7 @@ contract BuyBack {
     }
 
     /**
-     * @notice modifyAuctionAmountMulti modify the amount for multiple auction index
+     * @notice modifyAuctionAmountMulti Modify the amount for multiple auction index
      * @param _userAddress User addresss
      * @param _auctionIndexes Auction index the to participate 
      * @param _auctionAmounts Auction amount to fill in auction index
@@ -233,9 +236,9 @@ contract BuyBack {
     function modifyAuctionAmount(address _userAddress, uint _auctionIndex, uint _auctionAmount) public onlyOwner {
         require(_auctionAmount > 0);
         // checks if the auction index exists
-        require(auction[_userAddress][_auctionIndex] > 0);
+        require(auctionIndexWithAmount[_userAddress][_auctionIndex] > 0);
 
-        auction[_userAddress][_auctionIndex] = _auctionAmount;
+        auctionIndexWithAmount[_userAddress][_auctionIndex] = _auctionAmount;
         emit ModifyAuction(_auctionIndex, _auctionAmount);
     }
 
@@ -243,7 +246,7 @@ contract BuyBack {
      * @notice modifyAuctionIndexMulti
      * @param _userAddress User addresss
      * @param _auctionIndexes Auction index the to participate 
-     * @param _auctionAmounts Auction amount to fill in auction index
+     * @param _auctionAmounts Amount to participate in auction index
      */
     function modifyAuctionIndexMulti(address _userAddress, uint[] _auctionIndexes, uint[] _auctionAmounts) external onlyOwner  {
         require(_auctionIndexes.length > 0);
@@ -258,14 +261,14 @@ contract BuyBack {
      * @notice modifyAuctionIndex
      * @param _userAddress User addresss
      * @param _auctionIndex Auction index the to participate 
-     * @param _auctionAmount Auction amount to fill in auction index
+     * @param _auctionAmount Amount to participate in auction index
      */
     function modifyAuctionIndex(address _userAddress, uint _auctionIndex, uint _auctionAmount) public onlyOwner {
         require(_auctionAmount > 0);
-        require(auction[_userAddress][_auctionIndex] == 0);
+        require(auctionIndexWithAmount[_userAddress][_auctionIndex] == 0);
 
         buybacks[_userAddress].auctionIndexes.push(_auctionIndex);
-        auction[_userAddress][_auctionIndex] = _auctionAmount;
+        auctionIndexWithAmount[_userAddress][_auctionIndex] = _auctionAmount;
         emit ModifyAuction(_auctionIndex, _auctionAmount);
     }
 
@@ -277,7 +280,7 @@ contract BuyBack {
     function modifySellToken(address _userAddress, address _sellToken) public onlyOwner {
         require(address(_sellToken) != address(0));
         require(address(_userAddress) != address(0));
-        require(_sellToken !=  buybacks[_userAddress].buyToken);
+        require(_sellToken != buybacks[_userAddress].buyToken);
 
         buybacks[_userAddress].sellToken = _sellToken;
         emit ModifyToken(_userAddress, _sellToken);
@@ -322,7 +325,7 @@ contract BuyBack {
      * @param _auctionIndex Auction index
      */  
     function getAuctionAmount(address _userAddress, uint _auctionIndex) public view returns( uint ) {
-        return auction[_userAddress][_auctionIndex];
+        return auctionIndexWithAmount[_userAddress][_auctionIndex];
     }
 
     /**
@@ -337,7 +340,7 @@ contract BuyBack {
         uint auctionIndex = buybacks[_userAddress].auctionIndexes[_index];
 
         // ensure uniqueness
-        uint acIndex = dxAuctionIndexMap[_userAddress][auctionIndex];
+        uint acIndex = dxAuctionIndex[_userAddress][auctionIndex];
 
         // ensure not currently participating in an auction
         require(alreadyClaimed[_userAddress][acIndex] == false);
@@ -352,8 +355,8 @@ contract BuyBack {
             buybacks[_userAddress].auctionIndexes.length--;
         }
 
-        uint amount = auction[_userAddress][auctionIndex];
-        delete auction[_userAddress][auctionIndex];
+        uint amount = auctionIndexWithAmount[_userAddress][auctionIndex];
+        delete auctionIndexWithAmount[_userAddress][auctionIndex];
         emit RemoveAuctionIndex(_userAddress, auctionIndex, amount);
     }
     
@@ -390,8 +393,8 @@ contract BuyBack {
         delete balances[_userAddress][buyToken];
 
         for(uint i = 0; i < auctionIndexes.length; i++){
-            delete auction[_userAddress][auctionIndexes[i]];
-            delete dxAuctionIndexMap[_userAddress][auctionIndexes[i]];
+            delete auctionIndexWithAmount[_userAddress][auctionIndexes[i]];
+            delete dxAuctionIndex[_userAddress][auctionIndexes[i]];
             delete alreadyClaimed[_userAddress][auctionIndexes[i]];
         }
 
@@ -444,7 +447,7 @@ contract BuyBack {
     }
 
     /**
-     * @notice getTokenBalance
+     * @notice getTokenBalance get the balance of a token for a user
      * @param _userAddress User addresss
      * @param _tokenAddress User addresss
      */
@@ -475,7 +478,7 @@ contract BuyBack {
      * @param _amount Amount of the sell token
      */
     function approveDutchX(address _sellToken, uint _amount) internal {
-        require(Token(_sellToken).approve(dutchXAddress, _amount));
+        require(Token(_sellToken).approve(dx, _amount));
     }
 
     /**
@@ -489,38 +492,48 @@ contract BuyBack {
     }
 
     /**
+     * @notice checkAllowExternalPoke check if non owner is allowed to poke
+     * @param _userAddress User addresss
+     */
+    function checkAllowExternalPoke(address _userAddress, address _sender) internal view returns (bool) {
+        if(buybacks[_userAddress].allowExternalPoke == false){
+            require(_sender == owner);
+        }
+        return true;
+    }
+
+    /**
      * @notice postSellOrder approve trading
      * @param _userAddress User addresss
      */
     function postSellOrder(address _userAddress) public {
+        require(isTimePassed(_userAddress)); // ensure the min time has passed
+        require(claimedLastOrder(_userAddress)); // ensure the previous order has been claimed
+        require(checkAllowExternalPoke(_userAddress, msg.sender)); // check if non owner is allowed
         require(buybacks[_userAddress].auctionIndexes.length > 0); // ensure user exists
+        
+        Buyback memory userBuyback = buybacks[_userAddress];
 
         uint newBuyerBalance;
-        uint dxAuctionIndex;
+        uint dxIndex;
+        uint amount;
 
-        uint[] auctionIndexes = buybacks[_userAddress].auctionIndexes;
-        address sellToken = buybacks[_userAddress].sellToken;
-        address buyToken = buybacks[_userAddress].buyToken;
-
-        bool allowExternalPoke = buybacks[_userAddress].allowExternalPoke;
-        if(allowExternalPoke == false){
-            require(msg.sender == owner);
-        }
-
-        require(isTimePassed(_userAddress) == true); // ensure the min time has passed
-        require(claimedLastOrder(_userAddress) == true); // ensure the previous order has been claimed or burnt
+        uint[] memory auctionIndexes = userBuyback.auctionIndexes;
+        address sellToken = userBuyback.sellToken;
+        address buyToken = userBuyback.buyToken;
         
         for( uint i = 0; i < auctionIndexes.length; i++ ) {
-            uint amount = auction[_userAddress][auctionIndexes[i]];
+            amount = auctionIndexWithAmount[_userAddress][auctionIndexes[i]]; // get the auction amount for that index
             
-            require(balances[_userAddress][sellToken] >=  amount);
+            require(balances[_userAddress][sellToken] >=  amount); // check if the user as enough balance
 
             approveDutchX(sellToken, amount);
             depositDutchx(sellToken, amount);
 
-            (dxAuctionIndex, newBuyerBalance) = dx.postSellOrder(sellToken, buyToken, auctionIndexes[i], amount);
+            (dxIndex, newBuyerBalance) = dx.postSellOrder(sellToken, buyToken, auctionIndexes[i], amount);
 
-            dxAuctionIndexMap[_userAddress][auctionIndexes[i]] = dxAuctionIndex; // maps the auctionindex to the auctionIndex from dx
+            // maps the auction index to the auction index from dx auction
+            dxAuctionIndex[_userAddress][auctionIndexes[i]] = dxIndex;
             balances[_userAddress][sellToken] -= amount;
         }
 
@@ -530,7 +543,7 @@ contract BuyBack {
         // tip the user that poked the postSellOrder function
         tip(_userAddress, msg.sender);
 
-        emit PostSellOrder(_userAddress, buyToken, sellToken, balances[_userAddress][sellToken], amount, dxAuctionIndex);
+        emit PostSellOrder(_userAddress, buyToken, sellToken, balances[_userAddress][sellToken], amount, dxIndex);
     }
 
 
@@ -559,22 +572,32 @@ contract BuyBack {
      */
     function claim(address _userAddress) external {
         require(buybacks[_userAddress].auctionIndexes.length > 0); // ensure user exists
+                
+        Buyback memory userBuyback = buybacks[_userAddress];
+
+        uint[] memory auctionIndexes = userBuyback.auctionIndexes;
+        address sellToken = userBuyback.sellToken;
+        address buyToken = userBuyback.buyToken;
+        bool shouldBurnToken = userBuyback.shouldBurnToken;
+        address burnAddress = userBuyback.burnAddress;
 
         uint balance;
 
-        uint[] auctionIndexes = buybacks[_userAddress].auctionIndexes;
-        address sellToken = buybacks[_userAddress].sellToken;
-        address buyToken = buybacks[_userAddress].buyToken;
-        bool shouldBurnToken = buybacks[_userAddress].shouldBurnToken;
-        address burnAddress = buybacks[_userAddress].burnAddress;
-
         for(uint i = 0; i < auctionIndexes.length; i++) {
-            uint acIndex = dxAuctionIndexMap[_userAddress][auctionIndexes[i]];
-            if(alreadyClaimed[_userAddress][acIndex] == true){
+            // Get the dx auction index for a user auction index
+            // necessary in cases where user auction index is 0
+            uint acIndex = dxAuctionIndex[_userAddress][auctionIndexes[i]];
+
+            if(alreadyClaimed[_userAddress][acIndex]){
                 continue;
             }
+            // claim funds from dutchx
             (balance, ) = dx.claimSellerFunds(sellToken, buyToken, this, acIndex);
+            
+            // withdraw funds from dutchx
             uint newBal = dx.withdraw(buyToken, balance);
+
+            // set user claimed funds in index
             alreadyClaimed[_userAddress][acIndex] = true;
 
             if(shouldBurnToken){
@@ -596,6 +619,9 @@ contract BuyBack {
      /**
      * @notice withdraw
      * @param _userAddress User addresss
+     * @param _tokenAddress Contract address of token to withdraw
+     * @param _toAddress Address to send token to
+     * @param _amount Amount of tokens to withdraw
      */
     function withdraw(address _userAddress, address _tokenAddress, address _toAddress, uint _amount) external {
         require(_amount > 0);
@@ -642,6 +668,7 @@ contract BuyBack {
 
     /**
      * @notice tip the user that pokes the postSellOrder function
+     * @param _userAddress Address of user
      */
     function tip(address _userAddress, address _sender) internal returns(bool){
         uint amount = tips[_userAddress];

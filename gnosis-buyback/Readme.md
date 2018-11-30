@@ -26,3 +26,7 @@ npm install
 $ npm test
 ```
 
+### Example Use Case
+
+
+
