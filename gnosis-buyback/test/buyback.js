@@ -245,23 +245,54 @@ contract('Buyback', (accounts) => {
     )
   })
 
+  it("Should prevent non owner from modifying sell token", async() => {
+    catchRevert(
+      buyBack.modifySellToken(InitAccount, etherToken.address, {from: SellerAccount})
+    );
+  });
+
   it("Should allow to modify sell token", async() => {
     await buyBack.modifySellToken(InitAccount, etherToken.address, {from: InitAccount});
   })
+
+  it("Should prevent non owner from modifying tip price", async() => {
+    catchRevert(
+      buyBack.modifyTip(InitAccount, 10000000000, {from: SellerAccount})
+    );
+  });
 
   it("Should allow to modify tip price", async() => {
     const tx = await buyBack.modifyTip(InitAccount, 10000000000, {from: InitAccount});
     assert.equal(tx.logs[0].args.amount, 10000000000, "failed to modify tip price");
   })
 
+  it("Should prevent non owner from modifying buy token", async() => {
+    catchRevert(
+      buyBack.modifyBuyToken(InitAccount, tokenGNO.address, {from: SellerAccount})
+    );
+  });
+
   it("Should allow owner to modify buy token", async() => {
-    await buyBack.modifyBuyToken(InitAccount, tokenGNO.address, {from: InitAccount});
-
+    const tx = await buyBack.modifyBuyToken(InitAccount, tokenGNO.address, {from: InitAccount});
+    assert.equal(tx.logs[0].args.tokenAddress, tokenGNO.address, "failed to modify buy token");
   })
 
+  it("Should prevent non owner from modifying time interval", async() => {
+    catchRevert(
+      buyBack.modifyTimeInterval(InitAccount, 10, {from: SellerAccount})
+    );
+  });
+  
   it("Should allow to modify time interval", async() => {
-    await buyBack.modifyTimeInterval(InitAccount, 10, {from: InitAccount});
+    const tx = await buyBack.modifyTimeInterval(InitAccount, 10, {from: InitAccount});
+    assert.equal(tx.logs[0].args.timeInterval, 10, "failed to time interval");
   })
+
+  it("Should prevent non owner from removing auction index", async() => {
+    catchRevert(
+      buyBack.removeAuctionIndex(InitAccount, 4, {from: SellerAccount})
+    );
+  });
   
   it("Should allow to remove auction index", async() => {
     await buyBack.removeAuctionIndex(InitAccount, 4, {from: InitAccount})
@@ -297,6 +328,12 @@ contract('Buyback', (accounts) => {
     const balance = await buyBack.getTokenBalance.call( InitAccount, etherToken.address);
     assert.equal(balance, 0, "Failed to withdraw tokens")
   })
+
+  it("Should prevent non owner from removing buyback", async() => {
+    catchRevert(
+      buyBack.removeBuyBack(InitAccount, {from: SellerAccount})
+    );
+  });
 
   it("Should remove buyback with balance 0", async() => {
       await buyBack.removeBuyBack(InitAccount, {from: InitAccount})

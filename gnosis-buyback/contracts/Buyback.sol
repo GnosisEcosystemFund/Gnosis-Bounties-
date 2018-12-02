@@ -89,7 +89,7 @@ contract BuyBack {
 
     event ModifyToken(
         address indexed userAddress,
-        address indexed newToken
+        address indexed tokenAddress
     );
 
     event ModifyTimeInterval(
@@ -218,7 +218,11 @@ contract BuyBack {
      * @param _auctionIndexes Auction index the to participate 
      * @param _auctionAmounts Auction amount to fill in auction index
      */
-    function modifyAuctionAmountMulti(address _userAddress, uint[] _auctionIndexes, uint[] _auctionAmounts) external onlyOwner  {
+    function modifyAuctionAmountMulti(
+        address _userAddress, 
+        uint[] _auctionIndexes, 
+        uint[] _auctionAmounts
+        ) external onlyOwner  {
         require(_auctionIndexes.length > 0);
         require(_auctionIndexes.length == _auctionAmounts.length);
 
@@ -233,7 +237,11 @@ contract BuyBack {
      * @param _auctionIndex Auction index the to participate 
      * @param _auctionAmount Auction amount to fill in auction index
      */
-    function modifyAuctionAmount(address _userAddress, uint _auctionIndex, uint _auctionAmount) public onlyOwner {
+    function modifyAuctionAmount(
+        address _userAddress, 
+        uint _auctionIndex, 
+        uint _auctionAmount
+        ) public onlyOwner {
         require(_auctionAmount > 0);
         // checks if the auction index exists
         require(auctionIndexWithAmount[_userAddress][_auctionIndex] > 0);
@@ -248,7 +256,11 @@ contract BuyBack {
      * @param _auctionIndexes Auction index the to participate 
      * @param _auctionAmounts Amount to participate in auction index
      */
-    function modifyAuctionIndexMulti(address _userAddress, uint[] _auctionIndexes, uint[] _auctionAmounts) external onlyOwner  {
+    function modifyAuctionIndexMulti(
+        address _userAddress, 
+        uint[] _auctionIndexes, 
+        uint[] _auctionAmounts
+        ) external onlyOwner  {
         require(_auctionIndexes.length > 0);
         require(_auctionIndexes.length == _auctionAmounts.length);
 
@@ -263,7 +275,11 @@ contract BuyBack {
      * @param _auctionIndex Auction index the to participate 
      * @param _auctionAmount Amount to participate in auction index
      */
-    function modifyAuctionIndex(address _userAddress, uint _auctionIndex, uint _auctionAmount) public onlyOwner {
+    function modifyAuctionIndex(
+        address _userAddress, 
+        uint _auctionIndex, 
+        uint _auctionAmount
+        ) public onlyOwner {
         require(_auctionAmount > 0);
         require(auctionIndexWithAmount[_userAddress][_auctionIndex] == 0);
 
@@ -324,7 +340,10 @@ contract BuyBack {
      * @param _userAddress User addresss
      * @param _auctionIndex Auction index
      */  
-    function getAuctionAmount(address _userAddress, uint _auctionIndex) public view returns( uint ) {
+    function getAuctionAmount(
+        address _userAddress, 
+        uint _auctionIndex
+        ) public view returns( uint ) {
         return auctionIndexWithAmount[_userAddress][_auctionIndex];
     }
 
@@ -453,7 +472,10 @@ contract BuyBack {
      * @param _userAddress User addresss
      * @param _tokenAddress User addresss
      */
-    function getTokenBalance(address _userAddress, address _tokenAddress) public view returns (uint) {
+    function getTokenBalance(
+        address _userAddress, 
+        address _tokenAddress
+        ) public view returns (uint) {
         return balances[_userAddress][_tokenAddress];
     }
 
@@ -497,7 +519,10 @@ contract BuyBack {
      * @notice checkAllowExternalPoke check if non owner is allowed to poke
      * @param _userAddress User addresss
      */
-    function checkAllowExternalPoke(address _userAddress, address _sender) internal view returns (bool) {
+    function checkAllowExternalPoke(
+        address _userAddress, 
+        address _sender
+        ) internal view returns (bool) {
         if(buybacks[_userAddress].allowExternalPoke == false){
             require(_sender == owner);
         }
@@ -602,13 +627,13 @@ contract BuyBack {
             // set user claimed funds in index
             alreadyClaimed[_userAddress][acIndex] = true;
 
-            if(shouldBurnToken){
+            if(shouldBurnToken){ // check if should burn tokens
                 if( burnAddress != address(0) ){
                     burnTokensWithAddress(buyToken, burnAddress, balance);
                 } else {
                     burnTokens(buyToken, balance);
                 }
-            } else {
+            } else { // update user balance
                 balances[_userAddress][buyToken] += balance; 
             }
             
@@ -625,7 +650,12 @@ contract BuyBack {
      * @param _toAddress Address to send token to
      * @param _amount Amount of tokens to withdraw
      */
-    function withdraw(address _userAddress, address _tokenAddress, address _toAddress, uint _amount) external {
+    function withdraw(
+        address _userAddress, 
+        address _tokenAddress, 
+        address _toAddress, 
+        uint _amount
+        ) external {
         require(_amount > 0);
         require(buybacks[_userAddress].auctionIndexes.length > 0); // ensure user exists
         require(balances[_userAddress][_tokenAddress] >= _amount);     
@@ -657,7 +687,11 @@ contract BuyBack {
      * @param _burnAddress Address to send burn tokens
      * @param _amount Amount of tokens to burn
      */
-    function burnTokensWithAddress(address _tokenAddress, address _burnAddress, uint _amount) internal {
+    function burnTokensWithAddress(
+        address _tokenAddress, 
+        address _burnAddress, 
+        uint _amount
+        ) internal {
         // transfer the tokens to address(0)
         require(_amount > 0);
         require(Token(_tokenAddress).transfer(_burnAddress, _amount));
