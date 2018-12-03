@@ -459,7 +459,7 @@ contract BuyBack {
     }
 
     /**
-     * @notice getSellTokenBalance
+     * @notice getSellTokenBalance Get the sellToken balance e.g WETH 
      * @param _userAddress User addresss
      */
     function getSellTokenBalance(address _userAddress) public view returns (uint) {
@@ -535,7 +535,9 @@ contract BuyBack {
      */
     function postSellOrder(address _userAddress) public {
         require(isTimePassed(_userAddress)); // ensure the min time has passed
-        require(claimedLastOrder(_userAddress)); // ensure the previous order has been claimed
+        // ensure the previous order has been claimed 
+        // to prevent overwriting the ductchx Ids
+        require(claimedLastOrder(_userAddress)); 
         require(checkAllowExternalPoke(_userAddress, msg.sender)); // check if non owner is allowed
         require(buybacks[_userAddress].auctionIndexes.length > 0); // ensure user exists
         
