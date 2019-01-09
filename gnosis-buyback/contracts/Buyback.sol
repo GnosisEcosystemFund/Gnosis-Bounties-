@@ -43,8 +43,13 @@ contract BuyBack {
     // mapping of user address to auction id to whether an auction has been clamied
     mapping(address => mapping(uint => bool)) internal alreadyClaimed;
 
-    modifier onlyOwner (address _userAddress) {
+    modifier onlyOwner () {
         require(msg.sender == owner);
+        _;
+    }
+
+    modifier userExists (address _userAddress) {
+        require(buybacks[_userAddress].sellToken != address(0));
         _;
     }
 
@@ -131,7 +136,7 @@ contract BuyBack {
         address _userAddress, 
         uint[] _auctionIndexes, 
         uint[] _auctionAmounts
-        ) external onlyOwner  {
+        ) external userExists(_userAddress) {
         require(_auctionIndexes.length > 0);
         require(_auctionIndexes.length == _auctionAmounts.length);
 
@@ -150,13 +155,13 @@ contract BuyBack {
         address _userAddress, 
         uint _auctionIndex, 
         uint _auctionAmount
-        ) public onlyOwner {
+        ) public userExists(_userAddress) {
         require(_auctionAmount > 0);
         // checks if the auction index exists
         require(auctionIndexWithAmount[_userAddress][_auctionIndex] > 0);
 
         auctionIndexWithAmount[_userAddress][_auctionIndex] = _auctionAmount;
-        emit ModifyAuction(_auctionIndex, _auctionAmount);
+        emit ModifyAuction(_userAddress, _auctionIndex, _auctionAmount);
     }
 
     /**
@@ -169,7 +174,7 @@ contract BuyBack {
         address _userAddress, 
         uint[] _auctionIndexes, 
         uint[] _auctionAmounts
-        ) external onlyOwner  {
+        ) external userExists(_userAddress)  {
         require(_auctionIndexes.length > 0);
         require(_auctionIndexes.length == _auctionAmounts.length);
 
@@ -188,48 +193,20 @@ contract BuyBack {
         address _userAddress, 
         uint _auctionIndex, 
         uint _auctionAmount
-        ) public onlyOwner {
+        ) public userExists(_userAddress) {
         require(_auctionAmount > 0);
         require(auctionIndexWithAmount[_userAddress][_auctionIndex] == 0);
 
         buybacks[_userAddress].auctionIndexes.push(_auctionIndex);
         auctionIndexWithAmount[_userAddress][_auctionIndex] = _auctionAmount;
-        emit ModifyAuction(_auctionIndex, _auctionAmount);
+        emit ModifyAuction(_userAddress, _auctionIndex, _auctionAmount);
     }
-
-    // /**
-    //  * @notice modifySellToken
-    //  * @param _userAddress User addresss
-    //  * @param _sellToken Address of the sell token
-    //  */
-    // function modifySellToken(address _userAddress, address _sellToken) public onlyOwner {
-    //     require(address(_sellToken) != address(0));
-    //     require(address(_userAddress) != address(0));
-    //     require(_sellToken != buybacks[_userAddress].buyToken);
-
-    //     buybacks[_userAddress].sellToken = _sellToken;
-    //     emit ModifyToken(_userAddress, _sellToken);
-    // }
-
-    // /**
-    //  * @notice modifyBuyToken
-    //  * @param _userAddress User addresss
-    //  * @param _buyToken Address of the buy token
-    //  */
-    // function modifyBuyToken(address _userAddress, address _buyToken) public onlyOwner {
-    //     require(address(_buyToken) != address(0));
-    //     require(address(_userAddress) != address(0));
-    //     require(_buyToken !=  buybacks[_userAddress].sellToken);
-
-    //     buybacks[_userAddress].buyToken = _buyToken;
-    //     emit ModifyToken(_userAddress, _buyToken);
-    // }
 
     /**
      * @notice modifyTimeInterval
      * @param _userAddress User addresss
      */
-    function modifyTimeInterval(address _userAddress, uint _timeInterval) public onlyOwner {
+    function modifyTimeInterval(address _userAddress, uint _timeInterval) public userExists(_userAddress) {
         require(_timeInterval >= 0);
 
         buybacks[_userAddress].minTimeInterval = _timeInterval;
@@ -261,7 +238,7 @@ contract BuyBack {
      * @param _userAddress User addresss
      * @param _index The index in array auctionIndexes of the auctionIndex to delete
      */
-    function removeAuctionIndex(address _userAddress, uint _index) public onlyOwner {
+    function removeAuctionIndex(address _userAddress, uint _index) public userExists(_userAddress) {
         // ensure the index is not greater than the length
         require(_index < buybacks[_userAddress].auctionIndexes.length);
 
@@ -294,7 +271,7 @@ contract BuyBack {
      * @param _userAddress User addresss
      * @param _indexes indexes of the auction in array
      */
-    function removeAuctionIndexMulti(address _userAddress, uint[] _indexes) public onlyOwner {
+    function removeAuctionIndexMulti(address _userAddress, uint[] _indexes) public userExists(_userAddress) {
         require(_indexes.length > 0);
 
         for(uint i = 0; i < _indexes.length; i++) {
@@ -306,9 +283,7 @@ contract BuyBack {
      * @notice removeBuyBack
      * @param _userAddress User addresss
      */
-    function removeBuyBack(address _userAddress) public onlyOwner {
-        require(buybacks[_userAddress].auctionIndexes.length > 0);
-
+    function removeBuyBack(address _userAddress) public userExists(_userAddress) {
         Buyback memory userBuyback = buybacks[_userAddress];
 
         // remove all auction indexes 
@@ -338,7 +313,7 @@ contract BuyBack {
      * @param _userAddress User addresss
      * @param _burn to either burn or not burn i.e. True or false
      */
-    function modifyBurn(address _userAddress, bool _burn) public onlyOwner returns(bool) {
+    function modifyBurn(address _userAddress, bool _burn) public userExists(_userAddress) returns(bool) {
         buybacks[_userAddress].shouldBurnToken = _burn;
     }
     
@@ -355,7 +330,7 @@ contract BuyBack {
      * @param _userAddress User addresss
      * @param _burnAddress burn address
      */
-    function modifyBurnAddress(address _userAddress, address _burnAddress) public onlyOwner {
+    function modifyBurnAddress(address _userAddress, address _burnAddress) public userExists(_userAddress) {
         buybacks[_userAddress].burnAddress = _burnAddress;
         emit ModifyBurnAddress(_burnAddress);
     }
@@ -522,7 +497,7 @@ contract BuyBack {
                 balances[_userAddress][buyToken] += balance; 
             }
             
-            emit ClaimWithdraw(sellToken, buyToken, balance, newBal);
+            emit ClaimWithdraw(_userAddress, sellToken, buyToken, balance, newBal);
         }
 
         // set to true claimed sell order
@@ -567,7 +542,7 @@ contract BuyBack {
         userBalance -= _amount;
         balances[_userAddress][_tokenAddress] = userBalance; // set new balance
         require(Token(_tokenAddress).transfer(_toAddress, _amount));
-        emit Withdraw(_tokenAddress, _amount, userBalance);
+        emit Withdraw(_userAddress, _tokenAddress, _amount, userBalance);
     }
 
     /**
@@ -590,8 +565,8 @@ contract BuyBack {
 
         userBalance -= _amount;
         etherBalance[_userAddress] = userBalance; // set new balance
-        require(_toAddress.transfer(_amount));
-        emit Withdraw(_amount, userBalance);
+        bool result = _toAddress.send(_amount);
+        emit WithdrawEther(_userAddress, _amount, userBalance);
     }
 
     /**
@@ -615,7 +590,7 @@ contract BuyBack {
      * @param _userAddress Address of user
      * @param _allowExternalPoke bool externalPoke
      */
-    function modifyExternalPoke(address _userAddress, bool _allowExternalPoke) public onlyOwner {
+    function modifyExternalPoke(address _userAddress, bool _allowExternalPoke) public userExists(_userAddress) {
         buybacks[_userAddress].allowExternalPoke = _allowExternalPoke;
         emit ModifyExternalPoke(_userAddress, _allowExternalPoke);
     }
@@ -624,7 +599,7 @@ contract BuyBack {
      * @notice receive ether for compensation
      * Can set tip to zero if you don't want to tip
      */
-    function modifyTipAmount(address _userAddress, uint _amount) public onlyOwner {
+    function modifyTipAmount(address _userAddress, uint _amount) public userExists(_userAddress) {
         tips[_userAddress] = _amount;
         emit ModifyTipAmount(_userAddress, _amount);
     }
@@ -689,6 +664,7 @@ contract BuyBack {
     );
 
     event ClaimWithdraw(
+        address indexed userAddress,
         address indexed sellToken,
         address indexed buyToken,
         uint balance,
@@ -696,7 +672,14 @@ contract BuyBack {
     );
 
     event Withdraw(
+        address indexed userAddress,
         address indexed tokenAddress,
+        uint amount,
+        uint balance
+    );
+
+    event WithdrawEther(
+        address indexed userAddress,
         uint amount,
         uint balance
     );
@@ -708,6 +691,7 @@ contract BuyBack {
     );
 
     event ModifyAuction(
+        address indexed userAddress,
         uint auctionIndex,
         uint amount
     );
