@@ -206,7 +206,10 @@ contract BuyBack {
      * @notice modifyTimeInterval
      * @param _userAddress User addresss
      */
-    function modifyTimeInterval(address _userAddress, uint _timeInterval) public userExists(_userAddress) {
+    function modifyTimeInterval(
+        address _userAddress, 
+        uint _timeInterval
+    ) public userExists(_userAddress) {
         require(_timeInterval >= 0);
 
         buybacks[_userAddress].minTimeInterval = _timeInterval;
@@ -240,24 +243,26 @@ contract BuyBack {
      */
     function removeAuctionIndex(address _userAddress, uint _index) public userExists(_userAddress) {
         // ensure the index is not greater than the length
-        require(_index < buybacks[_userAddress].auctionIndexes.length);
+        Buyback storage userBuyback = buybacks[_userAddress];
+        uint[] storage auctionIndexes = userBuyback.auctionIndexes;
 
-        uint auctionIndex = buybacks[_userAddress].auctionIndexes[_index];
+        require(_index < auctionIndexes.length);
 
+        uint auctionIndex = auctionIndexes[_index];
         // ensure uniqueness
         uint acIndex = dxAuctionIndex[_userAddress][auctionIndex];
 
-        // ensure not currently participating in an auction
+        // ensure the auction proceeds is claimed
         require(alreadyClaimed[_userAddress][acIndex] == false);
 
-        if(buybacks[_userAddress].auctionIndexes.length == 1){
+        if(auctionIndexes.length == 1){
             delete buybacks[_userAddress].auctionIndexes[0];
         } else {
-            uint length = buybacks[_userAddress].auctionIndexes.length;
+            uint length = auctionIndexes.length;
             for (uint i = _index; i < length-1; i++){
-                buybacks[_userAddress].auctionIndexes[i] = buybacks[_userAddress].auctionIndexes[i+1];
+                auctionIndexes[i] = auctionIndexes[i+1];
             }
-            buybacks[_userAddress].auctionIndexes.length--;
+            auctionIndexes.length--;
         }
 
         uint amount = auctionIndexWithAmount[_userAddress][auctionIndex];
@@ -271,7 +276,10 @@ contract BuyBack {
      * @param _userAddress User addresss
      * @param _indexes indexes of the auction in array
      */
-    function removeAuctionIndexMulti(address _userAddress, uint[] _indexes) public userExists(_userAddress) {
+    function removeAuctionIndexMulti(
+        address _userAddress, 
+        uint[] _indexes
+    ) public userExists(_userAddress) {
         require(_indexes.length > 0);
 
         for(uint i = 0; i < _indexes.length; i++) {
@@ -382,16 +390,34 @@ contract BuyBack {
 
     /**
      * @notice checkAllowExternalPoke check if non owner is allowed to poke
-     * @param _userAddress User addresss
+     * @param _userAddress User address
+     * @param _sender Sender addresss
      */
     function checkAllowExternalPoke(
         address _userAddress, 
         address _sender
-        ) internal view returns (bool) {
+    ) internal view returns (bool) {
         if(buybacks[_userAddress].allowExternalPoke == false){
             require(_sender == owner);
         }
         return true;
+    }
+
+    /**
+     * @notice hasEnoughBalance
+     * @param _userAddress User addresss
+     */
+    function hasEnoughBalance(address _userAddress) internal view returns(bool) {        
+        Buyback memory userBuyback = buybacks[_userAddress];
+        uint[] memory auctionIndexes = userBuyback.auctionIndexes;
+        address sellToken = userBuyback.sellToken;
+        
+        uint total = 0;
+        for( uint i = 0; i < auctionIndexes.length; i++ ) {
+            total += auctionIndexWithAmount[_userAddress][auctionIndexes[i]];
+        }
+
+        return total <= balances[_userAddress][sellToken];
     }
 
     /**
@@ -405,6 +431,7 @@ contract BuyBack {
         require(claimedLastOrder(_userAddress)); 
         require(checkAllowExternalPoke(_userAddress, msg.sender)); // check if non owner is allowed
         require(buybacks[_userAddress].auctionIndexes.length > 0); // ensure user exists
+        require(hasEnoughBalance(_userAddress)); // ensure the user has enough balance
         
         Buyback storage userBuyback = buybacks[_userAddress];
 
@@ -451,7 +478,7 @@ contract BuyBack {
     }
 
     /**
-     * @notice isTimePassed approve trading
+     * @notice claimedLastOrder
      * @param _userAddress User addresss
      */
     function claimedLastOrder(address _userAddress) internal view returns(bool) {
