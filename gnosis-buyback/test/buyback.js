@@ -118,10 +118,10 @@ contract('Buyback', (accounts) => {
 
     dx = DutchExchange.at(dxAddress)
     
-    tokenGNO = await TokenGNO.deployed()
+    tokenGNO   = await TokenGNO.deployed()
     etherToken = await EtherToken.deployed()
-    owlProxy = await TokenOWLProxy.deployed()
-    tokenFRT =  await TokenFRT.deployed();
+    owlProxy   = await TokenOWLProxy.deployed()
+    tokenFRT   =  await TokenFRT.deployed();
     priceOracleInterface = await PriceOracleInterface.deployed()
     
     const ethUsdPrice = await dx.ethUSDOracle.call()    
@@ -135,6 +135,20 @@ contract('Buyback', (accounts) => {
     snapId = await takeSnapshot();
   })
 
+  it("Should prevent adding buyback with invalid arrays", async() => {
+    catchRevert(
+      buyBack.addBuyBack(
+        InitAccount,  
+        tokenGNO.address, 
+        etherToken.address, 
+        BurnAddress,
+        true, 
+        [0,1], 
+        [1e18], 0, true, web3.utils.toWei("1", 'ether'),
+        {from: InitAccount}
+      )
+    )
+  })
 
   it("Should add buyback", async() => {
     const tx = await buyBack.addBuyBack(
