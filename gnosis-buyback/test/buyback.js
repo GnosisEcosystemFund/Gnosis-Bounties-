@@ -313,7 +313,7 @@ contract('Buyback', (accounts) => {
     );
   });
 
-  it("Should prevent modifying auction multi with invalid array", async() => {
+  it("Should prevent modifying auction amount multi with invalid array", async() => {
     // add buyback
     await buyBack.addBuyBack(
       tokenGNO.address, 
@@ -329,7 +329,7 @@ contract('Buyback', (accounts) => {
     )
   })
 
-  it("Should prevent modifying auction multi with non existent auction index", async() => {
+  it("Should prevent modifying auction amount multi with non existent auction index", async() => {
 
     // add buyback
     await buyBack.addBuyBack(
@@ -403,7 +403,6 @@ contract('Buyback', (accounts) => {
   })
 
   it("Should allow to modify tip price", async() => {
-    
     // add buyback
     await buyBack.addBuyBack(
       tokenGNO.address, 
