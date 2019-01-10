@@ -133,8 +133,6 @@ modifyAuctionAmountMulti(address _userAddress, uint[] _auctionAmounts) | Modify 
 modifyAuctionAmount(uint _auctionIndex uint _auctionAmount) | Modify auction amounts |
 modifyAuctionIndexMulti( uint[] _auctionIndexes, uint[] _auctionAmounts) | Add new auction indexes with their amounts respectively |
 modifyAuctionIndex( uint _auctionIndex,uint _auctionAmount)  | Add new auction index with their amounts respectively for a `_userAddress` |
-modifySellToken(address _sellToken ) | Modify the sell token address |
-modifyBuyToken(address _buyToken) | Modify the token that should be bought via the dutchx auction |
 modifyTimeInterval(uint _timeInterval) | Modify the time interval between sell orders  |
 modifyTip(uint _amount)    | Modify the amount tipped for a non owner invoking the `postSellOrder` function      |
 modifyBurn(bool _burn)     | Modify wether the contract should burn the buytoken from the dutchx auction         |
@@ -145,12 +143,11 @@ modifyExternalPoke(bool _allowExternalPoke) | Set whether an external user is al
 ### Get Operations
 Function                                          | Description
 --------------------------------------------------|-------------------------------------------------------------------------------------
-getAuctionIndexes(address _userAddress)          | Get the auction indexes for a `_userAddress`                                        |
-getAuctionAmount( address _userAddress,uint _auctionIndex) | Get the auction amount for a `_userAdddress` & `_auctionIndex`   |
-getBurnAddress(address _userAddress)             | Get the burn address                                                                |
-getSellTokenBalance(address _userAddress)        | Get the sellToken balance e.g WETH                                                  |
-getTokenBalance( address _userAddress, address _tokenAddress) | Get balance for a `_userAddress` by providing the tokenAddress   |
-getEtherBalance(address _userAddress)            | Get the ether balance for a `_userAddress`                                          |
+getAuctionIndexes()          | Get the auction indexes for a `_userAddress`                                        |
+getAuctionAmount(uint _auctionIndex) | Get the auction amount for a `_userAdddress` & `_auctionIndex`   |
+getBurnAddress()             | Get the burn address                                                                |
+getSellTokenBalance()        | Get the sellToken balance e.g WETH                                                  |
+getTokenBalance( address _tokenAddress) | Get balance for a `_userAddress` by providing the tokenAddress   |
 
 ### Delete Operations
 Function                                          | Description
