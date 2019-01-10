@@ -250,7 +250,6 @@ contract('Buyback', (accounts) => {
     await buyBack.modifyBurnAddress(SecondBurnAddress, {from: InitAccount});
 
     const addr = await buyBack.getBurnAddress.call();
-    console.log({addr})
     assert.equal(addr, SecondBurnAddress, "failed to modify burn address");
   });
 
@@ -368,7 +367,6 @@ contract('Buyback', (accounts) => {
     
     const expected = 3 // length of auctionIndexes [0, 1, 3]
     const indexes = (await buyBack.getAuctionIndexes({from: InitAccount}));
-    console.log({ indexes })
     assert.equal(indexes.length, expected, "Failed to modify auction indexes")
   })
 
@@ -507,6 +505,91 @@ contract('Buyback', (accounts) => {
     await deposit();
   })
 
+  it("Should withdraw all ether deposit", async() => {
+
+    await buyBack.addBuyBack(
+      tokenGNO.address, 
+      etherToken.address, 
+      BurnAddress,
+      true, 
+      [0, 1], 
+      [1e18, 1e18], 0, true, web3.utils.toWei("1", 'ether'),
+      {from: InitAccount});
+
+    await deposit(); // deposit tokens
+
+    await buyBack.sendTransaction({from: InitAccount, value: 10e18})
+
+    let expectedBalance = 10e18
+    // check balance
+    let actualbalance = await buyBack.etherBalance.call(InitAccount);
+
+    assert.equal(actualbalance, expectedBalance, "Failed to deposit ether into contract");
+
+    await buyBack.withdrawEther(InitAccount, 10e18, {from: InitAccount});
+
+    expectedBalance = 0
+    actualbalance = await buyBack.etherBalance.call(InitAccount);
+
+    assert.equal(actualbalance, expectedBalance, "Failed to withdraw ether deposit");
+  })
+
+  it("Should withdraw part of ether deposit", async() => {
+
+    await buyBack.addBuyBack(
+      tokenGNO.address, 
+      etherToken.address, 
+      BurnAddress,
+      true, 
+      [0, 1], 
+      [1e18, 1e18], 0, true, web3.utils.toWei("1", 'ether'),
+      {from: InitAccount});
+
+    await deposit(); // deposit tokens
+
+    await buyBack.sendTransaction({from: InitAccount, value: 10e18})
+
+    let expectedBalance = 10e18
+    // check balance
+    let actualbalance = await buyBack.etherBalance.call(InitAccount);
+
+    assert.equal(actualbalance, expectedBalance, "Failed to deposit ether into contract");
+
+    await buyBack.withdrawEther(InitAccount, 5e18, {from: InitAccount});
+
+    expectedBalance = 5e18
+    actualbalance = await buyBack.etherBalance.call(InitAccount);
+
+    assert.equal(actualbalance, expectedBalance, "Failed to withdraw ether deposit");
+  })
+
+  it("Should prevent withdraw more than ether deposit", async() => {
+
+    await buyBack.addBuyBack(
+      tokenGNO.address, 
+      etherToken.address, 
+      BurnAddress,
+      true, 
+      [0, 1], 
+      [1e18, 1e18], 0, true, web3.utils.toWei("1", 'ether'),
+      {from: InitAccount});
+
+    await deposit(); // deposit tokens
+
+    await buyBack.sendTransaction({from: InitAccount, value: 10e18})
+
+    let expectedBalance = 10e18
+    // check balance
+    let actualbalance = await buyBack.etherBalance.call(InitAccount);
+
+    assert.equal(actualbalance, expectedBalance, "Failed to deposit ether into contract");
+
+    catchRevert(
+      buyBack.withdrawEther(InitAccount, 20e18, {from: InitAccount})
+    )
+
+  })
+
   it("Should withdraw all the balance", async() => {
 
     await buyBack.addBuyBack(
@@ -522,9 +605,31 @@ contract('Buyback', (accounts) => {
 
     await buyBack.withdraw(etherToken.address, WithdrawalAddress, 40e18, {from: InitAccount})
     const balance = await buyBack.getTokenBalance(etherToken.address, {from: InitAccount});
+
     assert.equal(balance, 0, "Failed to withdraw tokens")
   })
 
+  it("Should remove buyback with balance 0", async() => {
+
+    await buyBack.addBuyBack(
+      tokenGNO.address, 
+      etherToken.address, 
+      BurnAddress,
+      true, 
+      [0, 1], 
+      [1e18, 1e18], 0, true, web3.utils.toWei("1", 'ether'),
+      {from: InitAccount});
+
+      await deposit(); // deposit tokens
+    
+    await buyBack.withdraw(etherToken.address, WithdrawalAddress, 40e18, {from: InitAccount})
+
+    const tx = await buyBack.removeBuyBack({from: InitAccount})
+    const actual = tx.logs[0].args.auctionIndexes.map(item => item.toNumber())
+
+    assert.deepEqual(actual, [0, 1], "Failed to remove buyback")
+
+  })
 
   it("Should prevent removing buyback with balance not 0", async() => {
 
@@ -549,32 +654,9 @@ contract('Buyback', (accounts) => {
     );
   });
 
-  it("Should remove buyback with balance 0", async() => {
-
-    await buyBack.addBuyBack(
-      tokenGNO.address, 
-      etherToken.address, 
-      BurnAddress,
-      true, 
-      [0, 1], 
-      [1e18, 1e18], 0, true, web3.utils.toWei("1", 'ether'),
-      {from: InitAccount});
-
-      await deposit(); // deposit tokens
-    
-    await buyBack.withdraw(etherToken.address, WithdrawalAddress, 40e18, {from: InitAccount})
-
-    const tx = await buyBack.removeBuyBack({from: InitAccount})
-    const actual = tx.logs[0].args.auctionIndexes.map(item => item.toNumber())
-
-    assert.deepEqual(actual, [0, 1], "Failed to remove buyback")
-
-  })
-
   it("Should allow to pariticipate in dutchx auction, claim funds & burn it to an address", async() => {
 
     const currentBal = (await tokenGNO.balanceOf.call(BurnAddress)).toNumber()
-    console.log({currentBal})
     // add buyback
     await buyBack.addBuyBack( 
       tokenGNO.address, 
@@ -590,7 +672,6 @@ contract('Buyback', (accounts) => {
 
     // check burn address for balance
     const burnBalance = (await tokenGNO.balanceOf.call(BurnAddress)).toNumber()
-    console.log({burnBalance})
 
     assert.equal(burnBalance > currentBal, true, "Failed to burn withdrawn tokens");
 
@@ -707,12 +788,12 @@ contract('Buyback', (accounts) => {
 
     // add buyback
     await buyBack.addBuyBack( 
-                    tokenGNO.address, 
-                    etherToken.address, 
-                    BurnAddress, 
-                    true, [0], 
-                    [1e18], 0, true, web3.utils.toWei("0.01", 'ether'),
-                    {from: InitAccount});     
+      tokenGNO.address, 
+      etherToken.address, 
+      BurnAddress, 
+      true, [0], 
+      [1e18], 0, true, web3.utils.toWei("0.01", 'ether'),
+      {from: InitAccount});     
 
     // deposit tokens
     await deposit();
