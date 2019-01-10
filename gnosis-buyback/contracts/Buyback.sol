@@ -60,7 +60,7 @@ contract BuyBack {
      * @param _dx Address of the dutch exchange
      */
     function BuyBack(address _dx) public {
-        require(address(_dx) != address(0));
+        require(address(_dx) != address(0), "Invalid address");
         dx = DutchExchange(_dx);
         owner = msg.sender;
     }
@@ -161,7 +161,7 @@ contract BuyBack {
         ) public userExists() {
         address _userAddress = msg.sender;
 
-        require(_auctionAmount > 0);
+        require(_auctionAmount > 0, "Auction amount is not greater than zero");
         // checks if the auction index exists
         require(auctionIndexWithAmount[_userAddress][_auctionIndex] > 0, "Auction index doesn't exist");
 
@@ -178,8 +178,11 @@ contract BuyBack {
         uint[] _auctionIndexes, 
         uint[] _auctionAmounts
         ) external userExists()  {
+            
         require(_auctionIndexes.length > 0);
-        require(_auctionIndexes.length == _auctionAmounts.length, "Auction index and amount length not equal");
+        require(
+            _auctionIndexes.length == _auctionAmounts.length, 
+            "Auction index and amount length not equal");
 
         for(uint i = 0; i < _auctionIndexes.length; i++){
             modifyAuctionIndex(_auctionIndexes[i], _auctionAmounts[i]);
@@ -198,8 +201,10 @@ contract BuyBack {
         
         address _userAddress = msg.sender;
 
-        require(_auctionAmount > 0);
-        require(auctionIndexWithAmount[_userAddress][_auctionIndex] == 0, "Auction index already exists");
+        require(_auctionAmount > 0, "Auction amount is not greater than zero");
+        require(
+            auctionIndexWithAmount[_userAddress][_auctionIndex] == 0, 
+            "Auction index already exists");
 
         buybacks[_userAddress].auctionIndexes.push(_auctionIndex);
         auctionIndexWithAmount[_userAddress][_auctionIndex] = _auctionAmount;
@@ -567,7 +572,7 @@ contract BuyBack {
         address _userAddress = msg.sender;
 
         require(_amount > 0, "withdrawal amount is not greater than zero");
-        
+
         uint userBalance = balances[_userAddress][_tokenAddress];
 
         require(userBalance >= _amount, "user balance is less than withdrawal amount");
