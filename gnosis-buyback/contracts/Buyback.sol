@@ -3,8 +3,10 @@ pragma solidity ^0.4.21;
 import "@gnosis.pm/util-contracts/contracts/Token.sol";
 import "@gnosis.pm/dx-contracts/contracts/DutchExchange.sol";
 import "@gnosis.pm/dx-contracts/contracts/Oracle/PriceOracleInterface.sol";
+import "./SafeMath.sol";
 
 contract BuyBack {
+    using SafeMath for uint;
 
     address owner;
     DutchExchange public dx;
@@ -48,8 +50,8 @@ contract BuyBack {
         _;
     }
 
-    modifier userExists (address _userAddress) {
-        require(buybacks[_userAddress].sellToken != address(0));
+    modifier userExists () {
+        require(buybacks[msg.sender].sellToken != address(0));
         _;
     }
 
@@ -65,7 +67,6 @@ contract BuyBack {
        
     /**
      * @notice addBuyBack
-     * @param _userAddress Address of the user 
      * @param _buyToken Address of the buy token
      * @param _sellToken Address of the sell token
      * @param _burn Burn the token after buy back success
@@ -75,7 +76,6 @@ contract BuyBack {
      * @param _allowExternalPoke Allow non owners to call postSellOrder
     */
     function addBuyBack(
-        address _userAddress,
         address _buyToken,
         address _sellToken, 
         address _burnAddress, 
@@ -87,6 +87,8 @@ contract BuyBack {
         uint tipAmount
         ) public {
 
+        address _userAddress = msg.sender;
+
         require(address(_userAddress) != address(0));
         require(address(_buyToken) != address(0));
         require(address(_sellToken) != address(0));
@@ -94,6 +96,7 @@ contract BuyBack {
         require(_auctionIndexes.length == _auctionAmounts.length);
         require(buybacks[_userAddress].sellToken == address(0)); // ensure the user address doesn't exist
         
+
         // // map the auction ids to the auction amount
         for(uint i = 0; i < _auctionIndexes.length; i++){
             require(_auctionAmounts[i] > 0); // ensure the auction amount is greater than zero
@@ -128,34 +131,33 @@ contract BuyBack {
 
     /**
      * @notice modifyAuctionAmountMulti Modify the amount for multiple auction index
-     * @param _userAddress User addresss
      * @param _auctionIndexes Auction index the to participate 
      * @param _auctionAmounts Auction amount to fill in auction index
      */
     function modifyAuctionAmountMulti(
-        address _userAddress, 
         uint[] _auctionIndexes, 
         uint[] _auctionAmounts
-        ) external userExists(_userAddress) {
+        ) external userExists() {
+
         require(_auctionIndexes.length > 0);
         require(_auctionIndexes.length == _auctionAmounts.length);
 
         for(uint i = 0; i < _auctionIndexes.length; i++){
-            modifyAuctionAmount(_userAddress, _auctionIndexes[i], _auctionAmounts[i]);
+            modifyAuctionAmount(_auctionIndexes[i], _auctionAmounts[i]);
         }
     }
 
     /**
      * @notice modifyAuctionAmount modify the amount for an auction index
-     * @param _userAddress user addrese
      * @param _auctionIndex Auction index the to participate 
      * @param _auctionAmount Auction amount to fill in auction index
      */
     function modifyAuctionAmount(
-        address _userAddress, 
         uint _auctionIndex, 
         uint _auctionAmount
-        ) public userExists(_userAddress) {
+        ) public userExists() {
+        address _userAddress = msg.sender;
+
         require(_auctionAmount > 0);
         // checks if the auction index exists
         require(auctionIndexWithAmount[_userAddress][_auctionIndex] > 0);
@@ -166,34 +168,33 @@ contract BuyBack {
 
     /**
      * @notice modifyAuctionIndexMulti
-     * @param _userAddress User addresss
      * @param _auctionIndexes Auction index the to participate 
      * @param _auctionAmounts Amount to participate in auction index
      */
     function modifyAuctionIndexMulti(
-        address _userAddress, 
         uint[] _auctionIndexes, 
         uint[] _auctionAmounts
-        ) external userExists(_userAddress)  {
+        ) external userExists()  {
         require(_auctionIndexes.length > 0);
         require(_auctionIndexes.length == _auctionAmounts.length);
 
         for(uint i = 0; i < _auctionIndexes.length; i++){
-            modifyAuctionIndex(_userAddress, _auctionIndexes[i], _auctionAmounts[i]);
+            modifyAuctionIndex(_auctionIndexes[i], _auctionAmounts[i]);
         }
     }
 
     /**
      * @notice modifyAuctionIndex
-     * @param _userAddress User addresss
      * @param _auctionIndex Auction index the to participate 
      * @param _auctionAmount Amount to participate in auction index
      */
     function modifyAuctionIndex(
-        address _userAddress, 
         uint _auctionIndex, 
         uint _auctionAmount
-        ) public userExists(_userAddress) {
+        ) public userExists() {
+        
+        address _userAddress = msg.sender;
+
         require(_auctionAmount > 0);
         require(auctionIndexWithAmount[_userAddress][_auctionIndex] == 0);
 
@@ -204,48 +205,91 @@ contract BuyBack {
 
     /**
      * @notice modifyTimeInterval
-     * @param _userAddress User addresss
      */
     function modifyTimeInterval(
-        address _userAddress, 
         uint _timeInterval
-    ) public userExists(_userAddress) {
+    ) public userExists() {
         require(_timeInterval >= 0);
+
+        address _userAddress = msg.sender;
 
         buybacks[_userAddress].minTimeInterval = _timeInterval;
         emit ModifyTimeInterval(_userAddress, _timeInterval);
     }
 
     /**
+     * @notice modifyBurn should burn the bought tokens
+     * @param _burn to either burn or not burn i.e. True or false
+     */
+    function modifyBurn(bool _burn) public userExists() returns(bool) {
+        address _userAddress = msg.sender;
+        buybacks[_userAddress].shouldBurnToken = _burn;
+        emit ModifyBurn(_userAddress, _burn);
+    }
+
+    /**
+     * @notice modifyBurnAddress modify address burnt tokens should be sent to
+     * @param _burnAddress burn address
+     */
+    function modifyBurnAddress(address _burnAddress) public userExists() {
+        address _userAddress = msg.sender;
+        buybacks[_userAddress].burnAddress = _burnAddress;
+        emit ModifyBurnAddress(_userAddress, _burnAddress);
+    }
+
+    /**
      * @notice getAuctionIndexes
-     * @param _userAddress User addresss
      */    
-    function getAuctionIndexes(address _userAddress) public view returns (uint[]){
-        return buybacks[_userAddress].auctionIndexes;
+    function getAuctionIndexes() public view returns (uint[]){
+        return buybacks[msg.sender].auctionIndexes;
     }
 
     /**
      * @notice getAuctionAmount amount to pariticipate in an auction index
-     * @param _userAddress User addresss
      * @param _auctionIndex Auction index
      */  
     function getAuctionAmount(
-        address _userAddress, 
         uint _auctionIndex
         ) public view returns( uint ) {
-        return auctionIndexWithAmount[_userAddress][_auctionIndex];
+        return auctionIndexWithAmount[msg.sender][_auctionIndex];
+    }
+
+    /**
+     * @notice getBurnAddress
+     */
+    function getBurnAddress() public view returns(address) {
+        return buybacks[msg.sender].burnAddress;
+    }
+
+    /**
+     * @notice getSellTokenBalance Get the sellToken balance e.g WETH 
+     */
+    function getSellTokenBalance() public view returns (uint) {
+        address sellToken = buybacks[msg.sender].sellToken;
+        return balances[msg.sender][sellToken];
+    }
+
+    /**
+     * @notice getTokenBalance get the balance of a token for a user
+     * @param _tokenAddress User addresss
+     */
+    function getTokenBalance(
+        address _tokenAddress
+        ) public view returns (uint) {
+        return balances[msg.sender][_tokenAddress];
     }
 
     /**
      * @notice removeAuctionIndex
-     * @param _userAddress User addresss
      * @param _index The index in array auctionIndexes of the auctionIndex to delete
      */
-    function removeAuctionIndex(address _userAddress, uint _index) public userExists(_userAddress) {
-        // ensure the index is not greater than the length
+    function removeAuctionIndex(uint _index) public userExists() {
+        address _userAddress = msg.sender;
+
         Buyback storage userBuyback = buybacks[_userAddress];
         uint[] storage auctionIndexes = userBuyback.auctionIndexes;
 
+        // ensure the index is not greater than the length
         require(_index < auctionIndexes.length);
 
         uint auctionIndex = auctionIndexes[_index];
@@ -273,25 +317,25 @@ contract BuyBack {
     
     /**
      * @notice removeAuctionIndexMulti
-     * @param _userAddress User addresss
      * @param _indexes indexes of the auction in array
      */
     function removeAuctionIndexMulti(
-        address _userAddress, 
         uint[] _indexes
-    ) public userExists(_userAddress) {
+    ) public userExists() {
+
         require(_indexes.length > 0);
 
         for(uint i = 0; i < _indexes.length; i++) {
-            removeAuctionIndex(_userAddress, _indexes[i]); 
+            removeAuctionIndex(_indexes[i]); 
         }
     }
 
     /**
      * @notice removeBuyBack
-     * @param _userAddress User addresss
      */
-    function removeBuyBack(address _userAddress) public userExists(_userAddress) {
+    function removeBuyBack() public userExists() {
+        address _userAddress = msg.sender;
+
         Buyback memory userBuyback = buybacks[_userAddress];
 
         // remove all auction indexes 
@@ -315,33 +359,6 @@ contract BuyBack {
 
         emit RemoveAuction(_userAddress, auctionIndexes);
     }
-    
-    /**
-     * @notice modifyBurn should burn the bought tokens
-     * @param _userAddress User addresss
-     * @param _burn to either burn or not burn i.e. True or false
-     */
-    function modifyBurn(address _userAddress, bool _burn) public userExists(_userAddress) returns(bool) {
-        buybacks[_userAddress].shouldBurnToken = _burn;
-    }
-    
-    /**
-     * @notice getBurnAddress
-     * @param _userAddress User addresss
-     */
-    function getBurnAddress(address _userAddress) public view returns(address) {
-        return buybacks[_userAddress].burnAddress;
-    }
-
-    /**
-     * @notice modifyBurnAddress modify address burnt tokens should be sent to
-     * @param _userAddress User addresss
-     * @param _burnAddress burn address
-     */
-    function modifyBurnAddress(address _userAddress, address _burnAddress) public userExists(_userAddress) {
-        buybacks[_userAddress].burnAddress = _burnAddress;
-        emit ModifyBurnAddress(_burnAddress);
-    }
 
     /**
      * @notice updateDutchExchange
@@ -351,39 +368,20 @@ contract BuyBack {
     }
 
     /**
-     * @notice getSellTokenBalance Get the sellToken balance e.g WETH 
-     * @param _userAddress User addresss
-     */
-    function getSellTokenBalance(address _userAddress) public view returns (uint) {
-        address sellToken = buybacks[_userAddress].sellToken;
-        return balances[_userAddress][sellToken];
-    }
-
-    /**
-     * @notice getTokenBalance get the balance of a token for a user
-     * @param _userAddress User addresss
-     * @param _tokenAddress User addresss
-     */
-    function getTokenBalance(
-        address _userAddress, 
-        address _tokenAddress
-        ) public view returns (uint) {
-        return balances[_userAddress][_tokenAddress];
-    }
-
-    /**
      * @notice depositSellToken
-     * @param _userAddress Address of the deposited token 
      * @param _amount Amount of tokens deposited 10^18
      */
-    function depositSellToken(address _userAddress, uint _amount) public returns (uint) {
-        require(_amount > 0);
-        require(buybacks[_userAddress].sellToken != address(0));
+    function depositSellToken( uint _amount) public returns (uint) {
+        address _userAddress = msg.sender;
 
         address sellToken = buybacks[_userAddress].sellToken;
+
+        require(_amount > 0);
+        require(sellToken != address(0));
+
         require(Token(sellToken).transferFrom(msg.sender, this, _amount));
         
-        balances[_userAddress][sellToken] += _amount;
+        balances[_userAddress][sellToken] = balances[_userAddress][sellToken].add(_amount);
         emit Deposit(_userAddress, _userAddress, _amount);
         return _amount;
     }
@@ -414,7 +412,7 @@ contract BuyBack {
         
         uint total = 0;
         for( uint i = 0; i < auctionIndexes.length; i++ ) {
-            total += auctionIndexWithAmount[_userAddress][auctionIndexes[i]];
+            total = auctionIndexWithAmount[_userAddress][auctionIndexes[i]].add(total);
         }
 
         return total <= balances[_userAddress][sellToken];
@@ -425,6 +423,7 @@ contract BuyBack {
      * @param _userAddress User addresss
      */
     function postSellOrder(address _userAddress) public {
+
         require(isTimePassed(_userAddress)); // ensure the min time has passed
         // ensure the previous order has been claimed 
         // to prevent overwriting the ductchx Ids
@@ -457,7 +456,7 @@ contract BuyBack {
 
             // maps the auction index to the auction index from dx auction
             dxAuctionIndex[_userAddress][auctionIndexes[i]] = dxIndex;
-            userSellTokenBalance -= amount;
+            userSellTokenBalance = userSellTokenBalance.sub(amount);
 
             balances[_userAddress][sellToken] = userSellTokenBalance;
         }
@@ -521,7 +520,7 @@ contract BuyBack {
             if(shouldBurnToken){ // check if should burn tokens
                 burnTokens(buyToken, burnAddress, balance);
             } else { // update user balance
-                balances[_userAddress][buyToken] += balance; 
+                balances[_userAddress][buyToken] = balance.add(balances[_userAddress][buyToken]); 
             }
             
             emit ClaimWithdraw(_userAddress, sellToken, buyToken, balance, newBal);
@@ -539,7 +538,7 @@ contract BuyBack {
     function burnTokens(address _tokenAddress, address _burnAddress, uint _amount) internal {
         // transfer the tokens to address(0)
         require(_amount > 0);
-        require(Token(_tokenAddress).transfer(address(0), _amount));
+        require(Token(_tokenAddress).transfer(_burnAddress, _amount));
         emit Burn(
             _tokenAddress,
             address(0),
@@ -549,24 +548,24 @@ contract BuyBack {
 
     /**
      * @notice withdraw
-     * @param _userAddress User addresss
      * @param _tokenAddress Contract address of token to withdraw
      * @param _toAddress Address to send token to
      * @param _amount Amount of tokens to withdraw
      */
     function withdraw(
-        address _userAddress, 
         address _tokenAddress, 
         address _toAddress, 
         uint _amount
-        ) external {
+        ) userExists() external {
+        address _userAddress = msg.sender;
+
         require(_amount > 0);
         uint userBalance = balances[_userAddress][_tokenAddress];
 
         require(buybacks[_userAddress].auctionIndexes.length > 0); // ensure user exists
         require(userBalance >= _amount);
 
-        userBalance -= _amount;
+        userBalance = userBalance.sub(_amount);
         balances[_userAddress][_tokenAddress] = userBalance; // set new balance
         require(Token(_tokenAddress).transfer(_toAddress, _amount));
         emit Withdraw(_userAddress, _tokenAddress, _amount, userBalance);
@@ -574,15 +573,16 @@ contract BuyBack {
 
     /**
      * @notice withdrawEther
-     * @param _userAddress User addresss
      * @param _toAddress Address to send token to
      * @param _amount Amount of tokens to withdraw
      */
     function withdrawEther(
-        address _userAddress, 
         address _toAddress, 
         uint _amount
         ) external {
+
+        address _userAddress = msg.sender;
+
         require(_amount > 0);
         uint userBalance = etherBalance[_userAddress];
         require(userBalance >= _amount);
@@ -590,7 +590,7 @@ contract BuyBack {
         // require(buybacks[_userAddress].auctionIndexes.length > 0); // ensure user exists
         // require(userBalance >= _amount);
 
-        userBalance -= _amount;
+        userBalance = userBalance.sub(_amount);
         etherBalance[_userAddress] = userBalance; // set new balance
         bool result = _toAddress.send(_amount);
         emit WithdrawEther(_userAddress, _amount, userBalance);
@@ -602,22 +602,16 @@ contract BuyBack {
     function() external payable {
         require(msg.value > 0); // ether deposit is greater than 0
         address userAddress = msg.sender;
-        etherBalance[userAddress] += msg.value;
-    }
-
-    /**
-     * @notice getEtherBalance
-     */
-    function getEtherBalance(address _userAddress) public view returns(uint) {
-        return etherBalance[_userAddress];
+        etherBalance[userAddress] = etherBalance[userAddress].add(msg.value);
     }
 
     /**
      * @notice modifyExternalPoke
-     * @param _userAddress Address of user
      * @param _allowExternalPoke bool externalPoke
      */
-    function modifyExternalPoke(address _userAddress, bool _allowExternalPoke) public userExists(_userAddress) {
+    function modifyExternalPoke(bool _allowExternalPoke) public userExists() {
+        address _userAddress = msg.sender;
+
         buybacks[_userAddress].allowExternalPoke = _allowExternalPoke;
         emit ModifyExternalPoke(_userAddress, _allowExternalPoke);
     }
@@ -626,7 +620,9 @@ contract BuyBack {
      * @notice receive ether for compensation
      * Can set tip to zero if you don't want to tip
      */
-    function modifyTipAmount(address _userAddress, uint _amount) public userExists(_userAddress) {
+    function modifyTipAmount(uint _amount) public userExists() {
+        address _userAddress = msg.sender;
+
         tips[_userAddress] = _amount;
         emit ModifyTipAmount(_userAddress, _amount);
     }
@@ -655,11 +651,12 @@ contract BuyBack {
      * @param _userAddress Address of user
      */
     function tip(address _userAddress, address _sender) internal returns(bool){
-        uint amount = tips[_userAddress];
-        uint balance = getEtherBalance(_userAddress);
-        bool result = false;
+        uint amount  = tips[_userAddress];
+        uint balance = etherBalance[_userAddress];
+        bool result  = false;
         if(balance > amount && amount > 0){
-            etherBalance[_userAddress] -= amount;
+            balance = balance.sub(amount);
+            etherBalance[_userAddress] = balance;
             result = _sender.send(amount);
             emit Tip(_userAddress, _sender, amount);
         }
@@ -724,7 +721,13 @@ contract BuyBack {
     );
 
     event ModifyBurnAddress(
+        address indexed userAddress,
         address burnAddress
+    );
+
+    event ModifyBurn(
+        address indexed userAddress,
+        bool shouldBurnToken
     );
 
     event ModifyToken(

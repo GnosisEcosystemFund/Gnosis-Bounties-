@@ -39,7 +39,6 @@ The buyback contract has the following MAJOR operations:
 <pre>
 <code> 
 addBuyBack(
-        address _userAddress,
         address _buyToken,
         address _sellToken,
         address _burnAddress,
@@ -54,7 +53,7 @@ addBuyBack(
 </pre>
 </td>
 <td>
-Add a buyback configuration for a <em>_userAddress</em> e.g. 0x1
+Add a buyback configuration
 You can specify the buytoken e.g. LPT and the sellToken e.g. WETH,
 it also allows to set whether the buytoken should be burnt `bool _burn` or not.<br />
 
@@ -73,7 +72,7 @@ This can be useful in cases where a non-owner ( <em>_allowExternalPoke</em> = Tr
 <td>
 <pre>
 <code>
-depositSellToken(address _userAddress, uint _amount)
+depositSellToken(uint _amount)
 </code>
 </pre>
 </td>
@@ -113,7 +112,6 @@ configured burnAddress.
 <pre>
 <code>
 withdraw(
-       address _userAddress, 
        address _tokenAddress, 
        address _toAddress, 
        uint _amount 
@@ -122,7 +120,7 @@ withdraw(
 </pre>
 </td>
 <td>
-Withdraw an amount of tokens e.g. WETH by providing the _tokenAddress & _userAddress
+Withdraw an amount of tokens e.g. WETH by providing the _tokenAddress, amount and destination address (_toAddress)
 </td>
 </tr>
 </table>
@@ -131,17 +129,17 @@ Withdraw an amount of tokens e.g. WETH by providing the _tokenAddress & _userAdd
 
 Function                                          | Description
 --------------------------------------------------|-------------------------------------------------------------------------------------
-modifyAuctionAmountMulti( address _userAddress,  address _userAddress, uint[] _auctionAmounts) | Modify multiple auction amounts   |
-modifyAuctionAmount( address _userAddress,uint _auctionIndex uint _auctionAmount) | Modify auction amounts |
-modifyAuctionIndexMulti( address _userAddress, uint[] _auctionIndexes, uint[] _auctionAmounts) | Add new auction indexes with their amounts respectively |
-modifyAuctionIndex(address _userAddress,uint _auctionIndex,uint _auctionAmount)  | Add new auction index with their amounts respectively for a `_userAddress` |
-modifySellToken(address _userAddress, address _sellToken ) | Modify the sell token address |
-modifyBuyToken(address _userAddress, address _buyToken) | Modify the token that should be bought via the dutchx auction |
-modifyTimeInterval(address _userAddress,uint _timeInterval) | Modify the time interval between sell orders  |
-modifyTip(address _userAddress, uint _amount)    | Modify the amount tipped for a non owner invoking the `postSellOrder` function      |
-modifyBurn(address _userAddress, bool _burn)     | Modify wether the contract should burn the buytoken from the dutchx auction         |
-modifyBurnAddress(address _userAddress, address _burnAddress) | Modify the address the tokens should be burnt to, default is `0x0`                  |
-modifyExternalPoke(address _userAddress,bool _allowExternalPoke) | Set whether an external user is allowed to invoke the `postSellOrder` function      |
+modifyAuctionAmountMulti(address _userAddress, uint[] _auctionAmounts) | Modify multiple auction amounts   |
+modifyAuctionAmount(uint _auctionIndex uint _auctionAmount) | Modify auction amounts |
+modifyAuctionIndexMulti( uint[] _auctionIndexes, uint[] _auctionAmounts) | Add new auction indexes with their amounts respectively |
+modifyAuctionIndex( uint _auctionIndex,uint _auctionAmount)  | Add new auction index with their amounts respectively for a `_userAddress` |
+modifySellToken(address _sellToken ) | Modify the sell token address |
+modifyBuyToken(address _buyToken) | Modify the token that should be bought via the dutchx auction |
+modifyTimeInterval(uint _timeInterval) | Modify the time interval between sell orders  |
+modifyTip(uint _amount)    | Modify the amount tipped for a non owner invoking the `postSellOrder` function      |
+modifyBurn(bool _burn)     | Modify wether the contract should burn the buytoken from the dutchx auction         |
+modifyBurnAddress(address _burnAddress) | Modify the address the tokens should be burnt to, default is `0x0`                  |
+modifyExternalPoke(bool _allowExternalPoke) | Set whether an external user is allowed to invoke the `postSellOrder` function      |
 
 
 ### Get Operations
@@ -157,9 +155,9 @@ getEtherBalance(address _userAddress)            | Get the ether balance for a `
 ### Delete Operations
 Function                                          | Description
 --------------------------------------------------|-------------------------------------------------------------------------------------
-removeAuctionIndex(address _userAddress,uint _index) | Delete a auction index from the list of auctions
-removeAuctionIndexMulti(address _userAddress, uint[] _indexes) | Remove multiple auction indexes
-removeBuyBack(address _userAddress) | Remove buyback configuration for a `_userAddress`
+removeAuctionIndex(uint _index) | Delete a auction index from the list of auctions
+removeAuctionIndexMulti(uint[] _indexes) | Remove multiple auction indexes
+removeBuyBack() | Remove buyback configuration for a `_userAddress`
 
 ### Tutorial
 - Deploy the contract
