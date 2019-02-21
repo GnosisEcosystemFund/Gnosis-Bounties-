@@ -86,6 +86,7 @@ contract BuyBack {
         bool _allowExternalPoke,
         uint tipAmount
         ) public {
+        require(hasEnoughBalance(_userAddress), "user does not have enough balance to create buyback");
 
         address _userAddress = msg.sender;
 
@@ -160,57 +161,35 @@ contract BuyBack {
         uint _auctionAmount
         ) public userExists() {
         address _userAddress = msg.sender;
+        address sellToken    = buybacks[_userAddress].sellToken;
+        uint userBalance     = balances[msg.sender][sellToken];
 
         require(_auctionAmount > 0, "Auction amount is not greater than zero");
         // checks if the auction index exists
         require(auctionIndexWithAmount[_userAddress][_auctionIndex] > 0, "Auction index doesn't exist");
 
+        uint currentAmount = auctionIndexWithAmount[_userAddress][_auctionIndex];
+        uint userAuctionAmountTotal = getAuctionAmountTotal(_userAddress);
+        // ensure that the user has enough balance to increase amount of auction index
+        uint auctionTotal = userAuctionAmountTotal.sub(currentAmount);
+        require(auctionTotal.add(_auctionAmount) <= userBalance, "User does not have enough balance");
+
         auctionIndexWithAmount[_userAddress][_auctionIndex] = _auctionAmount;
         emit ModifyAuction(_userAddress, _auctionIndex, _auctionAmount);
     }
 
-    /**
-     * @notice modifyAuctionIndexMulti
-     * @param _auctionIndexes Auction index the to participate 
-     * @param _auctionAmounts Amount to participate in auction index
-     */
-    function modifyAuctionIndexMulti(
-        uint[] _auctionIndexes, 
-        uint[] _auctionAmounts
-        ) external userExists()  {
-            
-        require(_auctionIndexes.length > 0);
-        require(
-            _auctionIndexes.length == _auctionAmounts.length, 
-            "Auction index and amount length not equal");
+    function getAuctionAmountTotal(address _userAddress) internal view returns(uint) {
+        uint[] storage auctionIndexes = buybacks[_userAddress].auctionIndexes;
+        uint total = 0;
 
-        for(uint i = 0; i < _auctionIndexes.length; i++){
-            modifyAuctionIndex(_auctionIndexes[i], _auctionAmounts[i]);
+        for(uint i = 0; i < auctionIndexes.length; i++){
+            uint auctionAmount = auctionIndexWithAmount[_userAddress][auctionIndexes[i]];
+            total = total.add(auctionAmount);
         }
+
+        return total;
     }
-
-    /**
-     * @notice modifyAuctionIndex
-     * @param _auctionIndex Auction index the to participate 
-     * @param _auctionAmount Amount to participate in auction index
-     */
-    function modifyAuctionIndex(
-        uint _auctionIndex, 
-        uint _auctionAmount
-        ) public userExists() {
-        
-        address _userAddress = msg.sender;
-
-        require(_auctionAmount > 0, "Auction amount is not greater than zero");
-        require(
-            auctionIndexWithAmount[_userAddress][_auctionIndex] == 0, 
-            "Auction index already exists");
-
-        buybacks[_userAddress].auctionIndexes.push(_auctionIndex);
-        auctionIndexWithAmount[_userAddress][_auctionIndex] = _auctionAmount;
-        emit ModifyAuction(_userAddress, _auctionIndex, _auctionAmount);
-    }
-
+    
     /**
      * @notice modifyTimeInterval
      */
@@ -285,57 +264,6 @@ contract BuyBack {
         address _tokenAddress
         ) public view returns (uint) {
         return balances[msg.sender][_tokenAddress];
-    }
-
-    /**
-     * @notice removeAuctionIndex
-     * @param _index The index in array auctionIndexes of the auctionIndex to delete
-     */
-    function removeAuctionIndex(uint _index) public userExists() {
-        address _userAddress = msg.sender;
-
-        Buyback storage userBuyback = buybacks[_userAddress];
-        uint[] storage auctionIndexes = userBuyback.auctionIndexes;
-
-        // ensure the index is not greater than the length
-        require(_index < auctionIndexes.length, "Index exceeds array capacity");
-
-        uint auctionIndex = auctionIndexes[_index];
-        // ensure uniqueness
-        uint acIndex = dxAuctionIndex[_userAddress][auctionIndex];
-
-        // ensure the auction proceeds is claimed
-        require(alreadyClaimed[_userAddress][acIndex] == false, "Previous auction proceed haven't been claimed");
-
-        if(auctionIndexes.length == 1){
-            delete buybacks[_userAddress].auctionIndexes[0];
-        } else {
-            uint length = auctionIndexes.length;
-            for (uint i = _index; i < length-1; i++){
-                auctionIndexes[i] = auctionIndexes[i+1];
-            }
-            auctionIndexes.length--;
-        }
-
-        uint amount = auctionIndexWithAmount[_userAddress][auctionIndex];
-        delete auctionIndexWithAmount[_userAddress][auctionIndex];
-        emit RemoveAuctionIndex(_userAddress, auctionIndex, amount);
-    }
-    
-    
-    /**
-     * @notice removeAuctionIndexMulti
-     * @param _indexes indexes of the auction in array
-     */
-    function removeAuctionIndexMulti(
-        uint[] _indexes
-    ) public userExists() {
-
-        require(_indexes.length > 0);
-
-        for(uint i = 0; i < _indexes.length; i++) {
-            removeAuctionIndex(_indexes[i]); 
-        }
     }
 
     /**
@@ -428,6 +356,16 @@ contract BuyBack {
     }
 
     /**
+     * @notice hasEnoughTippingBalance
+     * @param _userAddress User addresss
+     */
+    function hasEnoughTippingBalance(address _userAddress) internal view returns(bool){
+        uint tippingAmount = tips[_userAddress];
+        uint ethBalance = etherBalance[_userAddress];
+        return ethBalance >= tippingAmount;
+    }
+
+    /**
      * @notice postSellOrder approve trading
      * @param _userAddress User addresss
      */
@@ -440,7 +378,8 @@ contract BuyBack {
         require(checkAllowExternalPoke(_userAddress, msg.sender),  "external user poke is not allowed");
         require(buybacks[_userAddress].auctionIndexes.length > 0, "user doesn't exist");
         require(hasEnoughBalance(_userAddress), "user does not have enough balance to post sell order");
-        
+        require(hasEnoughTippingBalance(_userAddress), "user does not have enough tipping balance");
+
         Buyback storage userBuyback = buybacks[_userAddress];
 
         uint newBuyerBalance;

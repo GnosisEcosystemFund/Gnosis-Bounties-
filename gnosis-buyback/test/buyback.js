@@ -155,7 +155,16 @@ contract('Buyback', (accounts) => {
     )
   })
 
+  it("Should deposit tokens", async() => {
+    // deposit tokens
+    await deposit();
+  })
+
   it("Should add buyback", async() => {
+    // deposit tokens
+    await deposit();
+
+    // create buyback
     const tx = await buyBack.addBuyBack(
                         tokenGNO.address, 
                         etherToken.address, 
@@ -169,7 +178,9 @@ contract('Buyback', (accounts) => {
   })
 
   it("Should deposit ether into buyback", async() => {
-    
+    // deposit tokens
+    await deposit();
+
     // add buyback
     await buyBack.addBuyBack(
       tokenGNO.address, 
@@ -191,6 +202,9 @@ contract('Buyback', (accounts) => {
   })
 
   it("Should allow user to modify burn", async() => {
+    // deposit tokens
+    await deposit();
+
     // add buyback
     await buyBack.addBuyBack(
       tokenGNO.address, 
@@ -215,6 +229,9 @@ contract('Buyback', (accounts) => {
   });
 
   it("Should allow to modify poke", async() => {
+    // deposit tokens
+    await deposit();
+
      // add buyback
      await buyBack.addBuyBack(
       tokenGNO.address, 
@@ -236,6 +253,9 @@ contract('Buyback', (accounts) => {
   });
 
   it("Should allow to modify burn address", async() => {
+    // deposit tokens
+    await deposit();
+    
     // add buyback
     await buyBack.addBuyBack(
       tokenGNO.address, 
@@ -490,19 +510,6 @@ contract('Buyback', (accounts) => {
     catchRevert(
       buyBack.removeAuctionIndexMulti(InitAccount, [], {from: InitAccount})
     )
-  })
-
-  it("Should deposit tokens", async() => {
-    await buyBack.addBuyBack(
-      tokenGNO.address, 
-      etherToken.address, 
-      BurnAddress,
-      true, 
-      [0, 1], 
-      [1e18, 1e18], 0, true, web3.utils.toWei("1", 'ether'),
-      {from: InitAccount});
-
-    await deposit();
   })
 
   it("Should withdraw all ether deposit", async() => {
