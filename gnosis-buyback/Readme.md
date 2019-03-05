@@ -131,8 +131,6 @@ Function                                          | Description
 --------------------------------------------------|-------------------------------------------------------------------------------------
 modifyAuctionAmountMulti(address _userAddress, uint[] _auctionAmounts) | Modify multiple auction amounts   |
 modifyAuctionAmount(uint _auctionIndex uint _auctionAmount) | Modify auction amounts |
-modifyAuctionIndexMulti( uint[] _auctionIndexes, uint[] _auctionAmounts) | Add new auction indexes with their amounts respectively |
-modifyAuctionIndex( uint _auctionIndex,uint _auctionAmount)  | Add new auction index with their amounts respectively for a `_userAddress` |
 modifyTimeInterval(uint _timeInterval) | Modify the time interval between sell orders  |
 modifyTip(uint _amount)    | Modify the amount tipped for a non owner invoking the `postSellOrder` function      |
 modifyBurn(bool _burn)     | Modify wether the contract should burn the buytoken from the dutchx auction         |

@@ -31,9 +31,9 @@ contract('Buyback', (accounts) => {
     await etherToken.approve(BuyBackAccount, 40e18, {from: InitAccount})
 
     // deposits ethertoken
-    await buyBack.depositSellToken(40e18, {from: InitAccount})
+    await buyBack.depositSellToken(40e18, etherToken.address, {from: InitAccount})
 
-    const balance = await buyBack.getSellTokenBalance({from: InitAccount})
+    const balance = await buyBack.getTokenBalance(etherToken.address, {from: InitAccount})
     assert.equal(balance.toNumber(), 40e18, "Failed to deposit tokens")
 
     console.log(`
@@ -331,6 +331,27 @@ contract('Buyback', (accounts) => {
     assert.equal(actual, expected, "failed to modify auction amount");
   })
 
+  it("Should prevent to modify auction amount to amount greater than balance", async() => {
+    // deposit tokens
+    await deposit();
+    
+     // add buyback
+     await buyBack.addBuyBack(
+      tokenGNO.address, 
+      etherToken.address, 
+      BurnAddress,
+      true, 
+      [0,1], 
+      [1e18,1e18], 0, true, web3.utils.toWei("1", 'ether'),
+      {from: InitAccount});
+    
+    // modify auction amount
+    catchRevert(
+      buyBack.modifyAuctionAmount(1, 100e18, {from: InitAccount})
+    )
+  });
+
+
   it("Should prevent non existent user from modifying auction amount", async() => {
     catchRevert(
       buyBack.modifyAuctionAmountMulti([1], [3e18], {from: SellerAccount})
@@ -358,7 +379,7 @@ contract('Buyback', (accounts) => {
 
   it("Should prevent modifying auction amount multi with non existent auction index", async() => {
     // deposit tokens
-        await deposit();
+    await deposit();
     
     // add buyback
     await buyBack.addBuyBack(
@@ -380,57 +401,10 @@ contract('Buyback', (accounts) => {
   
   })
 
-  // it("Should allow to modify auction index", async() => {
-
-  //   // add buyback
-  //   await buyBack.addBuyBack(
-  //     tokenGNO.address, 
-  //     etherToken.address, 
-  //     BurnAddress,
-  //     true, 
-  //     [0,1], 
-  //     [1e18,1e18], 0, true, web3.utils.toWei("1", 'ether'),
-  //     {from: InitAccount});
-    
-  //   // add new auction index 
-  //   await buyBack.modifyAuctionIndex(3, 1e18, {from: InitAccount});
-    
-  //   const expected = 3 // length of auctionIndexes [0, 1, 3]
-  //   const indexes = (await buyBack.getAuctionIndexes({from: InitAccount}));
-  //   assert.equal(indexes.length, expected, "Failed to modify auction indexes")
-  // })
-
-  // it("Should allow to modify auction index multi", async() => {
-    
-  //   // add buyback
-  //   await buyBack.addBuyBack(
-  //     tokenGNO.address, 
-  //     etherToken.address, 
-  //     BurnAddress,
-  //     true, 
-  //     [0,1], 
-  //     [1e18, 1e18], 0, true, web3.utils.toWei("1", 'ether'),
-  //     {from: InitAccount});
-
-  //   await buyBack.modifyAuctionIndexMulti(
-  //     [4, 5],
-  //     [1e18, 1e18],
-  //     {from: InitAccount}
-  //   );
-    
-  //   const expected = 4 // length of auctionIndexes [0, 1, 4, 5]
-
-  //   const indexes = (await buyBack.getAuctionIndexes({from: InitAccount}));    
-  //   assert.equal(indexes.length, expected, "Failed to modify auction indexes")
-  // })
-
-  // it("Should prevent modify auction index multi with invalid array length", async() => {
-  //   catchRevert(
-  //     buyBack.modifyAuctionIndexMulti([4,5], [1e18], {from: InitAccount})
-  //   )
-  // })
-
   it("Should allow to modify tip price", async() => {
+    // deposit tokens     `
+    await deposit();
+ 
     // add buyback
     await buyBack.addBuyBack(
       tokenGNO.address, 
@@ -482,55 +456,6 @@ contract('Buyback', (accounts) => {
     );
   });
 
-  // it("Should allow to remove auction index", async() => {
-  //   // deposit tokens     `
-  //     await deposit();
-
-  //   // add buyback
-  //   await buyBack.addBuyBack(
-  //     tokenGNO.address, 
-  //     etherToken.address, 
-  //     BurnAddress,
-  //     true, 
-  //     [0,1], 
-  //     [1e18,1e18], 0, true, web3.utils.toWei("1", 'ether'),
-  //     {from: InitAccount});
-    
-  //   await buyBack.removeAuctionIndex(1, {from: InitAccount})
-  //   const indexes = (await buyBack.getAuctionIndexes({from: InitAccount}));
-  //   assert.equal(indexes.length, 1, "Failed to modify auction indexes")
-  // })
-
-  // it("Should prevent non existent from removing auction index", async() => {
-  //   catchRevert(
-  //     buyBack.removeAuctionIndex(4, {from: SellerAccount})
-  //   );
-  // });
-
-  // it("Should allow to remove auction indexes multi", async() => {
-    
-  //   // add buyback
-  //   await buyBack.addBuyBack(
-  //     tokenGNO.address, 
-  //     etherToken.address, 
-  //     BurnAddress,
-  //     true, 
-  //     [0,1, 3], 
-  //     [1e18, 1e18, 1e18], 0, true, web3.utils.toWei("1", 'ether'),
-  //     {from: InitAccount});
-
-  //   await buyBack.removeAuctionIndexMulti([0,1], {from: InitAccount})
-  //   const indexes = (await buyBack.getAuctionIndexes({from: InitAccount}));
-
-  //   assert.equal(indexes.length, 1, "Failed to modify auction indexes")
-  // })
-
-  it("Should prevent modify auction index multi with empty array length", async() => {
-    catchRevert(
-      buyBack.removeAuctionIndexMulti(InitAccount, [], {from: InitAccount})
-    )
-  })
-
   it("Should withdraw all ether deposit", async() => {
     // deposit tokens     `
     await deposit();
@@ -543,8 +468,6 @@ contract('Buyback', (accounts) => {
       [0, 1], 
       [1e18, 1e18], 0, true, web3.utils.toWei("1", 'ether'),
       {from: InitAccount});
-
-    // await deposit(); // deposit tokens
 
     await buyBack.sendTransaction({from: InitAccount, value: 10e18})
 
@@ -622,23 +545,13 @@ contract('Buyback', (accounts) => {
   it("Should withdraw all the balance", async() => {
     await deposit(); // deposit tokens
 
-    await buyBack.addBuyBack(
-      tokenGNO.address, 
-      etherToken.address, 
-      BurnAddress,
-      true, 
-      [0, 1], 
-      [1e18, 1e18], 0, true, web3.utils.toWei("1", 'ether'),
-      {from: InitAccount});
-
-
     await buyBack.withdraw(etherToken.address, WithdrawalAddress, 40e18, {from: InitAccount})
     const balance = await buyBack.getTokenBalance(etherToken.address, {from: InitAccount});
 
     assert.equal(balance, 0, "Failed to withdraw tokens")
   })
 
-  it("Should remove buyback with balance 0", async() => {
+  it("Should allow removing buyback", async() => {
     await deposit(); // deposit tokens
 
     await buyBack.addBuyBack(
@@ -650,8 +563,6 @@ contract('Buyback', (accounts) => {
       [1e18, 1e18], 0, true, web3.utils.toWei("1", 'ether'),
       {from: InitAccount});
 
-    await buyBack.withdraw(etherToken.address, WithdrawalAddress, 40e18, {from: InitAccount})
-
     const tx = await buyBack.removeBuyBack({from: InitAccount})
     const actual = tx.logs[0].args.auctionIndexes.map(item => item.toNumber())
 
@@ -659,7 +570,7 @@ contract('Buyback', (accounts) => {
 
   })
 
-  it("Should prevent removing buyback with balance not 0", async() => {
+  it("Should allow withdrawing entire deposit after removing buyback", async() => {
     
     await deposit(); // deposit tokens
 
@@ -671,10 +582,15 @@ contract('Buyback', (accounts) => {
       [0, 1], 
       [1e18, 1e18], 0, true, web3.utils.toWei("1", 'ether'),
       {from: InitAccount});
-      
-    catchRevert(
-      buyBack.removeBuyBack(InitAccount, {from: InitAccount})
-    )
+
+    await buyBack.removeBuyBack({from: InitAccount})
+
+    // withdraw entire deposit
+    await buyBack.withdraw(etherToken.address, WithdrawalAddress, 40e18, {from: InitAccount})
+
+    const balance = await buyBack.getTokenBalance(etherToken.address, {from: InitAccount});
+
+    assert.equal(balance, 0, "Failed to withdraw tokens")
   })
 
   it("Should prevent non existent user from removing buyback", async() => {
@@ -698,7 +614,9 @@ contract('Buyback', (accounts) => {
       [1e18], 0, true, web3.utils.toWei("1", 'ether'),
       {from: InitAccount}); 
     
-    // await deposit(); //deposit tokens
+    // deposit ether for tipping
+    await buyBack.sendTransaction({from: InitAccount, value: 10e18})
+
 
     await performAuctionAndClaim();
 
@@ -721,32 +639,18 @@ contract('Buyback', (accounts) => {
       [1e18], 0, true, web3.utils.toWei("0.000001", 'ether'),
       {from: InitAccount});     // deposit tokens
 
+      // deposit ether for tipping
+      await buyBack.sendTransaction({from: InitAccount, value: 10e18})
+
     await performAuctionAndClaim();
-  })
-
-  it("Should prevent calling postSellOrder if user doesn't have enough balance", async() => {
-    // deposit tokens
-    await deposit();
-
-    // add buyback
-    await buyBack.addBuyBack( 
-      tokenGNO.address, 
-      etherToken.address, 
-      BurnAddress, 
-      true, [0], 
-      [100e18], 0, false, web3.utils.toWei("0.01", 'ether'),
-      {from: InitAccount}); 
-
-    await approveAndDepositTradingAmounts();
-
-    await catchRevert(
-      buyBack.postSellOrder(InitAccount, {from: SellerAccount})
-    )  
   })
 
   it("Should prevent calling postSellOrder if external poke is false", async() => {
     // deposit tokens
     await deposit();
+
+    // deposit ether for tipping
+    await buyBack.sendTransaction({from: InitAccount, value: 10e18})
 
     // add buyback
     await buyBack.addBuyBack( 
@@ -767,6 +671,9 @@ contract('Buyback', (accounts) => {
   it("Should prevent being able to call postSellOrder if time period hasn't passed", async() => {
     // deposit tokens
     await deposit();
+
+    // deposit ether for tipping
+    await buyBack.sendTransaction({from: InitAccount, value: 10e18})
 
     // add buyback
     await buyBack.addBuyBack( 
@@ -800,7 +707,9 @@ contract('Buyback', (accounts) => {
       [1e18], 0, true, web3.utils.toWei("0.01", 'ether'),
       {from: InitAccount});
 
-    
+    // deposit ether for tipping
+    await buyBack.sendTransaction({from: InitAccount, value: 10e18})
+
     await approveAndDepositTradingAmounts();
 
     const bal = (await buyBack.getSellTokenBalance({from: InitAccount})).toNumber()
@@ -832,6 +741,9 @@ contract('Buyback', (accounts) => {
       true, [0], 
       [1e18], 0, true, web3.utils.toWei("0.01", 'ether'),
       {from: InitAccount});     
+    
+    // deposit ether for tipping
+    await buyBack.sendTransaction({from: InitAccount, value: 10e18})
     
     await approveAndDepositTradingAmounts();
 

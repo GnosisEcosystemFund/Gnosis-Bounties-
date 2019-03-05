@@ -64,6 +64,19 @@ contract BuyBack {
         dx = DutchExchange(_dx);
         owner = msg.sender;
     }
+
+    function hasEnoughDeposit(
+        uint[] _amounts, 
+        address _tokenAddress, 
+        address _userAddress
+    ) internal view returns (bool) {
+        uint total = 0;
+        for( uint i = 0; i < _amounts.length; i++ ) {
+            total = _amounts[i].add(total);
+        }
+
+        return total <= balances[_userAddress][_tokenAddress];
+    }
        
     /**
      * @notice addBuyBack
@@ -86,10 +99,9 @@ contract BuyBack {
         bool _allowExternalPoke,
         uint tipAmount
         ) public {
-        require(hasEnoughBalance(_userAddress), "user does not have enough balance to create buyback");
-
         address _userAddress = msg.sender;
 
+        require(hasEnoughDeposit(_auctionAmounts, _sellToken, _userAddress), "user does not have enough deposit to create buyback");
         require(address(_userAddress) != address(0), "Invalid user address");
         require(address(_buyToken) != address(0), "Invalid buy token address");
         require(address(_sellToken) != address(0), "Invalid sell token address");
@@ -162,7 +174,7 @@ contract BuyBack {
         ) public userExists() {
         address _userAddress = msg.sender;
         address sellToken    = buybacks[_userAddress].sellToken;
-        uint userBalance     = balances[msg.sender][sellToken];
+        uint userBalance     = balances[_userAddress][sellToken];
 
         require(_auctionAmount > 0, "Auction amount is not greater than zero");
         // checks if the auction index exists
@@ -278,13 +290,6 @@ contract BuyBack {
         uint[] memory auctionIndexes = userBuyback.auctionIndexes;
         address sellToken = userBuyback.sellToken;
         address buyToken = userBuyback.buyToken;
-        
-        // ensure all withdrawal is made
-        require(balances[_userAddress][sellToken] == 0, "balance is greater than 0"); 
-        require(balances[_userAddress][buyToken] == 0, "balance is greater than 0");
-
-        delete balances[_userAddress][sellToken];
-        delete balances[_userAddress][buyToken];
 
         for(uint i = 0; i < auctionIndexes.length; i++){
             delete auctionIndexWithAmount[_userAddress][auctionIndexes[i]];
@@ -308,18 +313,15 @@ contract BuyBack {
      * @notice depositSellToken
      * @param _amount Amount of tokens deposited 10^18
      */
-    function depositSellToken( uint _amount) public userExists() returns (uint) {
+    function depositSellToken( uint _amount, address _tokenAddress) public {
         address _userAddress = msg.sender;
-
-        address sellToken = buybacks[_userAddress].sellToken;
 
         require(_amount > 0, "Amount not greater than 0");
 
-        require(Token(sellToken).transferFrom(msg.sender, this, _amount));
+        require(Token(_tokenAddress).transferFrom(msg.sender, this, _amount));
         
-        balances[_userAddress][sellToken] = balances[_userAddress][sellToken].add(_amount);
-        emit Deposit(_userAddress, _userAddress, _amount);
-        return _amount;
+        balances[_userAddress][_tokenAddress] = balances[_userAddress][_tokenAddress].add(_amount);
+        emit Deposit(_userAddress, _tokenAddress, _amount);
     }
 
     /**
@@ -507,12 +509,16 @@ contract BuyBack {
         address _tokenAddress, 
         address _toAddress, 
         uint _amount
-        ) userExists() external {
+        ) external {
         address _userAddress = msg.sender;
-
+        uint userBalance = balances[_userAddress][_tokenAddress];
+        uint userAuctionTotal = getAuctionAmountTotal(_userAddress);
+        
+        // user isn't allowed to withdraw amount the affects
+        // the buyback
+        require(userAuctionTotal.add(_amount) <= userBalance, "user not allowed to withdraw balance");
         require(_amount > 0, "withdrawal amount is not greater than zero");
 
-        uint userBalance = balances[_userAddress][_tokenAddress];
 
         require(userBalance >= _amount, "user balance is less than withdrawal amount");
 
