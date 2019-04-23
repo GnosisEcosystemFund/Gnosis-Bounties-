@@ -12,8 +12,7 @@ The smart contract has customizable parameters to enable projects to easily perf
 - How much sell funds are committed in which auction index (amounts are modifiable and not necessarily the same amounts through each auction).
 - Burn possibility to the receipt token (once it’s claimed and withdrawn) (Optional).
 - Burn Address (Optional) address to send burnt tokens to
-- Minimum Time interval between executing token buybacks (Optional) 
-- Includes a possibilty for any party to trigger sell order and gives ether to the one who pokes to compensate for gas cost spent. (amount of ether tipped also modifiable)
+- Includes a possibilty for any party to trigger sell order and gives ether to the one who pokes to compensate for gas cost spent.
 
 ## Install
 ### Install requirements with npm:
@@ -40,14 +39,13 @@ The buyback contract has the following MAJOR operations:
 <code> 
 addBuyBack(
         address _buyToken,
-        address _sellToken,
-        address _burnAddress,
-        bool _burn,
-        uint[] _auctionIndexes,
-        uint[] _auctionAmounts, 
-        uint _timeInterval,
-        bool _allowExternalPoke,
-        uint tipAmount
+        address _sellToken, 
+        address _burnAddress, 
+        bool _burn, 
+        uint[] memory _auctionIndexes, 
+        uint[] memory _auctionAmounts,
+        uint _tipAmount,
+        uint _expires
 )
 </code>
 </pre>
@@ -60,12 +58,9 @@ it also allows to set whether the buytoken should be burnt `bool _burn` or not.<
 Specify the auction & amount to participate in via the auctionIndexes <em>uint[] auctionIndexes</em> and <em>uint[] auctionAmounts</em>. e.g To participate
 in the latest auction for LPT token and buy 10 WETH worth of LPT token,
 <em>[0]</em> and <em>[10]</em> for auctionIndex & amount respectively.
-<em>_allowExternalPoke</em> enables non owner of the buyback contract to invoke the <em>postSellOrder</em> & <em>tipAmount</em> allows you to tip
-some ether to the address that invokes the <em>postSellOrder</em> function.<br />
+<em>tipAmount</em> allows you to tip some ether to the address that invokes the <em>postSellOrder</em> function.<br />
+<em>expires</em> This is time for an unexecuted buyback to expire and the funds released back to the creator. The minimum time is one month.
 
-Time interval <em>_timeInterval</em> enables you to set minimum time passed before
-<em>postSellOrder</em> can be invoked by any address from the previous successful call.
-This can be useful in cases where a non-owner ( <em>_allowExternalPoke</em> = True ) is allowed to invoke the <em>postSellOrder</em> function.
 </td>
 </tr>
 <tr>
@@ -123,62 +118,68 @@ withdraw(
 Withdraw an amount of tokens e.g. WETH by providing the _tokenAddress, amount and destination address (_toAddress)
 </td>
 </tr>
+<tr>
+<td>
+<pre>
+<code>
+withdrawEther(
+       address _toAddress, 
+       uint _amount 
+)
+</code>
+</pre>
+</td>
+<td>
+Withdraw an ether despist
+</td>
+</tr>
+<tr>
+<td>
+<pre>
+<code>
+releaseBuyBackFund(uint _buybackId)
+</code>
+</pre>
+</td>
+<td>
+Release funds of an expired unexecuted buyback.
+</td>
+</tr>
 </table>
 
-### Edit Operations
-
-Function                                          | Description
---------------------------------------------------|-------------------------------------------------------------------------------------
-modifyAuctionAmountMulti(address _userAddress, uint[] _auctionAmounts) | Modify multiple auction amounts   |
-modifyAuctionAmount(uint _auctionIndex uint _auctionAmount) | Modify auction amounts |
-modifyTimeInterval(uint _timeInterval) | Modify the time interval between sell orders  |
-modifyTip(uint _amount)    | Modify the amount tipped for a non owner invoking the `postSellOrder` function      |
-modifyBurn(bool _burn)     | Modify wether the contract should burn the buytoken from the dutchx auction         |
-modifyBurnAddress(address _burnAddress) | Modify the address the tokens should be burnt to, default is `0x0`                  |
-modifyExternalPoke(bool _allowExternalPoke) | Set whether an external user is allowed to invoke the `postSellOrder` function      |
-
-
-### Get Operations
-Function                                          | Description
---------------------------------------------------|-------------------------------------------------------------------------------------
-getAuctionIndexes()          | Get the auction indexes for a `_userAddress`                                        |
-getAuctionAmount(uint _auctionIndex) | Get the auction amount for a `_userAdddress` & `_auctionIndex`   |
-getBurnAddress()             | Get the burn address                                                                |
-getSellTokenBalance()        | Get the sellToken balance e.g WETH                                                  |
-getTokenBalance( address _tokenAddress) | Get balance for a `_userAddress` by providing the tokenAddress   |
-
-### Delete Operations
-Function                                          | Description
---------------------------------------------------|-------------------------------------------------------------------------------------
-removeAuctionIndex(uint _index) | Delete a auction index from the list of auctions
-removeAuctionIndexMulti(uint[] _indexes) | Remove multiple auction indexes
-removeBuyBack() | Remove buyback configuration for a `_userAddress`
 
 ### Tutorial
 - Deploy the contract
 ```bash
 $ truffle migrate
 ```
-- Add buyback confiugration via the `addBuyBack` function. This allows you specify the auctionIndexes & amounts to participate in auctions. An optional time interval between executing buybacks. For example you can specify add a buyback configuration for a user with address `0x1`, with buy token OST & sell token WETH.
+- Add buyback confiugration via the `addBuyBack` function. This allows you specify the auctionIndexes & amounts to participate in auctions. For example you can specify add a buyback configuration for a user with address `0x1`, with buy token OST & sell token WETH.
 
 ```javascript
 const Buyback = artifacts.require("Buyback")
 const TokenGNO = artifacts.require('TokenGNO') // sample ERC20 Token contracts
 const EtherToken = artifacts.require("EtherToken") // sample ERC20 Token contracts
 
-const tx = await buyBack.addBuyBack(InitAccount, 
-                    tokenGNO.address, 
-                    etherToken.address, 
-                    BurnAddress, 
-                    true, [0], 
-                    [1e18], 0, true, web3.utils.toWei("0.01", 'ether'),
-                    {from: InitAccount});     
+// expiry date in 30 days if not executed
+let now = new Date()
+now = now.setDate(now.getDate() + 30)
+
+const tx = await buyBack.addBuyBack(
+       tokenGNO.address, 
+       etherToken.address, 
+       BurnAddress,
+       true, 
+       [ 0, 1 ], 
+       [ toWei(1), toWei(1) ], 
+       toWei(0.01),
+       now,
+       {from: InitAccount});     
 ```
 
 - PostSellOrder
 
 ```javascript
-const tx = await buyBack.postSellOrder(InitAccount, {from: InitAccount});
+const tx = await buyBack.postSellOrder(buybackId, {from: InitAccount});
 
 ```
 
@@ -186,11 +187,10 @@ const tx = await buyBack.postSellOrder(InitAccount, {from: InitAccount});
 
 ```javascript
 // claim the buyToken from the dutchX auction
-const tx = await buyBack.claim(InitAccount, {from: InitAccount});
+const tx = await buyBack.claim(buybackId, {from: InitAccount})
 
 // withdraw the claimed tokens to an address
 const withdraw = await buyBack.withdraw(
-       InitAccount,
        etherToken.address,
        WithdrawalAddress,
        40e18,
@@ -200,12 +200,10 @@ const withdraw = await buyBack.withdraw(
 ### Example Use Cases
 
 #### Control Available Tokens
+
 A project would take part as the seller in an auction, most commonly WETH (but could be any ERC20 such as DAI). 
 The auction the project would take part in is to buy back their SpecificToken would be WETH-SpecificToken (e.g. WETH as sellToken and SpecificToken as the BidToken).
 The project would pre-submit a WETH (or other ERC20) as the sellVolume to a smart contract, which executes the buybacks on its own. i.e. via the `depositSellToken` function.
-
-This project allows external people to poke the `postSellOrder` function by setting `allowExternalPoke` to `True`. The project also sets the `minTimeInterval` between
-succesful invokes to be every 30 days and `tipAmount` to compensate for gas costs as 0.001 ether.
 
 They decide to participate in the latest auction by setting auction index to `[0]` and buy 20 WETH worth of SpecificToken.
 The project can decide to withdraw the bought tokens from the buyback contract via the `withdraw` function.
@@ -213,6 +211,7 @@ The project can decide to withdraw the bought tokens from the buyback contract v
 The project is using the buyback contract to control the volume of tokens available on the market
 
 #### Burn Tokens
+
 A project would take part as the seller in an auction, most commonly WETH (but could be any ERC20 such as DAI). 
 The auction the project would take part in is to buy back their SpecificToken would be WETH-SpecificToken (e.g. WETH as sellToken and SpecificToken as the BidToken).
 The project would pre-submit a WETH (or other ERC20) as the sellVolume to a smart contract, which executes the buybacks on its own. i.e. via the `depositSellToken` function.

@@ -62,11 +62,17 @@ function truffleConfig ({
         gasPrice
       }
     },
+    solcVersion: '0.5.2',
     solc: {
       optimizer: {
         enabled: optimizedEnabled
       }
-    }
+    },
+    compilers: {
+      solc: {
+        version: "0.5.2",
+      },
+    },
   }
 }
 
