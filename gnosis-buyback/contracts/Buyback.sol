@@ -140,7 +140,7 @@ contract BuyBack {
         // ensure buyback has not  been executed
         require(userBuyback.hasExecutedBuyback == false, "buyback has been executed");
         // check if buyback has expired
-        require(isCurrentAuction(auctionIndex, sellToken, buyToken), "buyback has expired");
+        require(isCurrentAuction(auctionIndex, sellToken, buyToken), "auction index is not current");
         require(hasEnoughBalance(auctionAmount, userAddress, sellToken), "user does not have enough balance to post sell order");
         require(hasEnoughTippingBalance(userAddress, tipAmount), "user does not have enough tipping balance");
 
@@ -357,7 +357,7 @@ contract BuyBack {
         require(userBuyback.userAddress == userAddress, "only owner can release buyback fund");
         require(userBuyback.hasExecutedBuyback == false, "can only release funds of unexecuted buyback");
         require(userBuyback.auctionAmount > 0, "user does not exist");
-        
+
         address sellToken = userBuyback.sellToken;
         address buyToken = userBuyback.buyToken;
         uint auctionIndex = userBuyback.auctionIndex;
