@@ -18,12 +18,11 @@ contract BuyBack {
         address buyToken;
         address burnAddress;
         bool shouldBurnToken;
-        uint[] auctionIndexes; // This is a mapping of auction id to amount
+        uint auctionIndex;
+        uint auctionAmount;
         uint tipAmount;
-        uint expires; // time when buyback expires if not invoked
         bool hasExecutedBuyback;
         bool claimedSellOrder;
-
     }
 
     Buyback[] public buybacks;
@@ -42,13 +41,10 @@ contract BuyBack {
     // mapping of user address to ether deposit value
     mapping(address => uint) public etherBalance;
 
-    // mapping of buyback id to auction index to ductchx index for the auction index participated in
+    // mapping of buyback id to auction index to dutchx index
     mapping(uint => mapping(uint => uint)) public dxAuctionIndex;
     // mapping of buyback id to auction id to whether an auction has been clamied
     mapping(uint => mapping(uint => bool)) internal alreadyClaimed;
-
-    // mapping of buyback id to auction index and auction amount
-    mapping(uint => mapping(uint => uint)) public auctionIndexWithAmount;
 
 
     modifier onlyOwner () {
@@ -74,31 +70,22 @@ contract BuyBack {
         address _sellToken, 
         address _burnAddress, 
         bool _burn, 
-        uint[] memory _auctionIndexes, 
-        uint[] memory _auctionAmounts,
-        uint _tipAmount,
-        uint _expires
+        uint _auctionIndex, 
+        uint _auctionAmount,
+        uint _tipAmount
         ) public {
         address _userAddress = msg.sender;
 
-        require(hasEnoughDeposit(_auctionAmounts, _sellToken, _userAddress), "user does not have enough deposit to create buyback");
+        require(hasEnoughDeposit(_auctionAmount, _sellToken, _userAddress), "user does not have enough deposit to create buyback");
         require(hasEnoughTippingDeposit(_userAddress, _tipAmount), "user does not have enough tip balance");
         require(address(_userAddress) != address(0), "Invalid user address");
         require(address(_buyToken) != address(0), "Invalid buy token address");
         require(address(_sellToken) != address(0), "Invalid sell token address");
         require(_sellToken != _buyToken, "Invalid buy and sell token address");
-        require(_auctionIndexes.length == _auctionAmounts.length, "Invalid auction index length");
-        require(_expires >= (block.timestamp + 30 days), "minimum expiry time is one month");
-        
-        uint buybackId = buybacks.length;
+        require(_auctionAmount > 0, "Auction amount less than 0"); // ensure the auction amount is greater than zero
+        require(_auctionIndex > 0, "Auction index less than 0"); // ensure the auction index is not zero 
 
-        uint total = 0;
-        // // map the auction ids to the auction amount
-        for(uint i = 0; i < _auctionIndexes.length; i++){
-            require(_auctionAmounts[i] > 0, "Auction amount less than 0"); // ensure the auction amount is greater than zero
-            total = total.add(_auctionAmounts[i]);
-            auctionIndexWithAmount[buybackId][_auctionIndexes[i]] = _auctionAmounts[i];
-        }
+        uint buybackId = buybacks.length;
 
         Buyback memory buyback = Buyback(
             _userAddress,
@@ -106,9 +93,9 @@ contract BuyBack {
             _buyToken, 
             _burnAddress,
             _burn, 
-            _auctionIndexes, 
+            _auctionIndex, 
+            _auctionAmount,
             _tipAmount,
-            _expires,
             false,
             false
         );
@@ -119,7 +106,7 @@ contract BuyBack {
         userBuybacks[_userAddress].push(buybackId);
 
         // increase amount of tips and 
-        userBuybackAmountTotal[_userAddress][_sellToken] = userBuybackAmountTotal[_userAddress][_sellToken].add(total);
+        userBuybackAmountTotal[_userAddress][_sellToken] = userBuybackAmountTotal[_userAddress][_sellToken].add(_auctionAmount);
         userTipAmountTotal[_userAddress] = userTipAmountTotal[_userAddress].add(_tipAmount);
 
         emit AddBuyBack(
@@ -129,8 +116,8 @@ contract BuyBack {
             _sellToken, 
             _burnAddress, 
             _burn, 
-            _auctionIndexes, 
-            _auctionAmounts
+            _auctionIndex, 
+            _auctionAmount
         );
     }
 
@@ -141,70 +128,64 @@ contract BuyBack {
     function postSellOrder(uint _buybackId) public {
         Buyback storage userBuyback = buybacks[_buybackId];
 
-        uint[] memory auctionIndexes = userBuyback.auctionIndexes;
+        uint auctionIndex = userBuyback.auctionIndex;
+        uint auctionAmount = userBuyback.auctionAmount;
         address userAddress = userBuyback.userAddress;
         address sellToken = userBuyback.sellToken;
         uint tipAmount = userBuyback.tipAmount;
+        address buyToken = userBuyback.buyToken;
 
-        require(auctionIndexes.length > 0, "buyback doesn't exist");
+
+        require(auctionAmount > 0, "buyback doesn't exist");
         // ensure buyback has not  been executed
         require(userBuyback.hasExecutedBuyback == false, "buyback has been executed");
         // check if buyback has expired
-        require(isTimePassed(userBuyback.expires), "buyback has expired");
-        require(hasEnoughBalance(_buybackId, auctionIndexes, userAddress, sellToken), "user does not have enough balance to post sell order");
+        require(isCurrentAuction(auctionIndex, sellToken, buyToken), "buyback has expired");
+        require(hasEnoughBalance(auctionAmount, userAddress, sellToken), "user does not have enough balance to post sell order");
         require(hasEnoughTippingBalance(userAddress, tipAmount), "user does not have enough tipping balance");
 
 
         uint newBuyerBalance;
         uint dxIndex;
-        uint totalAmount = 0;
 
-        address buyToken = userBuyback.buyToken;        
         uint userSellTokenBalance = balances[userAddress][sellToken];
 
-        for( uint i = 0; i < auctionIndexes.length; i++ ) {
-            // get the auction amount for that index
-            uint amount = auctionIndexWithAmount[_buybackId][auctionIndexes[i]]; 
-            totalAmount = totalAmount.add(amount);
+        approveDutchX(sellToken, auctionAmount);
+        depositDutchx(sellToken, auctionAmount);
 
-            // check if the user as enough balance
-            require(userSellTokenBalance >= amount, "user does not have enough balance"); 
-
-            approveDutchX(sellToken, amount);
-            depositDutchx(sellToken, amount);
-
-            (dxIndex, newBuyerBalance) = dx.postSellOrder(sellToken, buyToken, auctionIndexes[i], amount);
-
-            // maps the auction index to the auction index from dx auction
-            dxAuctionIndex[_buybackId][auctionIndexes[i]] = dxIndex;
-            userSellTokenBalance = userSellTokenBalance.sub(amount);
-
-            balances[userAddress][sellToken] = userSellTokenBalance;
-        }
+        (dxIndex, newBuyerBalance) = dx.postSellOrder(sellToken, buyToken, auctionIndex, auctionAmount);
+        // maps the auction index to the auction index from dx auction
+        dxAuctionIndex[_buybackId][auctionIndex] = dxIndex;
+        userSellTokenBalance = userSellTokenBalance.sub(auctionAmount);
+        balances[userAddress][sellToken] = userSellTokenBalance;
 
         // tip the user that poked the postSellOrder function
         tip(userAddress, tipAmount, msg.sender);
         // set user executed buyback true
         userBuyback.hasExecutedBuyback = true;
 
-        userBuybackAmountTotal[userAddress][sellToken] = userBuybackAmountTotal[userAddress][sellToken].sub(totalAmount);
+        userBuybackAmountTotal[userAddress][sellToken] = userBuybackAmountTotal[userAddress][sellToken].sub(auctionAmount);
         userTipAmountTotal[userAddress] = userTipAmountTotal[userAddress].sub(tipAmount);
 
         emit PostSellOrder(
             _buybackId,
             userAddress,
-            buyToken, 
-            sellToken, 
+            buyToken,
+            sellToken,
             userSellTokenBalance
         );
- 
+
     }
 
     /**
-     * @notice updateDutchExchange
+     * @notice hasEnoughBalance
      */
-    function updateDutchExchange(DutchExchange _dx) external onlyOwner {
-        dx = _dx;
+    function hasEnoughBalance(
+        uint _auctionAmount,
+        address _userAddress,
+        address _sellToken
+    ) internal view returns(bool) {        
+        return _auctionAmount <= balances[_userAddress][_sellToken];
     }
 
     /**
@@ -216,80 +197,60 @@ contract BuyBack {
 
         require(_amount > 0, "Amount not greater than 0");
 
-        require(Token(_tokenAddress).transferFrom(msg.sender, address(this), _amount));
-        
+        require(Token(_tokenAddress).transferFrom(msg.sender, address(this), _amount), "failed to transfer tokens");
+
         balances[_userAddress][_tokenAddress] = balances[_userAddress][_tokenAddress].add(_amount);
         emit Deposit(_userAddress, _tokenAddress, _amount);
     }
 
     /**
-     * @notice approve trading
+     * @notice Claim funds from dx contract
      */
     function claim(uint _buybackId) external {
         Buyback storage userBuyback = buybacks[_buybackId];
-        uint[] memory auctionIndexes = buybacks[_buybackId].auctionIndexes;
-        address userAddress = userBuyback.userAddress;
-        // ensure user exists
-        require(auctionIndexes.length > 0, "user does not exist"); 
+        uint auctionAmount = buybacks[_buybackId].auctionAmount;
 
+        // ensure user exists
+        require(auctionAmount > 0, "user does not exist"); 
+
+        uint auctionIndex = buybacks[_buybackId].auctionIndex;
+        address userAddress = userBuyback.userAddress;
         address sellToken = userBuyback.sellToken;
         address buyToken = userBuyback.buyToken;
         bool shouldBurnToken = userBuyback.shouldBurnToken;
         address burnAddress = userBuyback.burnAddress;
 
-        uint balance;
+        uint acIndex = dxAuctionIndex[_buybackId][auctionIndex];
+        require(alreadyClaimed[_buybackId][acIndex] == false, "already claimed funds");
 
-        for(uint i = 0; i < auctionIndexes.length; i++) {
-            // Get the dx auction index for a user auction index
-            // necessary in cases where user auction index is 0
-            uint acIndex = dxAuctionIndex[_buybackId][auctionIndexes[i]];
+        uint balance;        
+        (balance, ) = dx.claimSellerFunds(sellToken, buyToken, address(this), acIndex);
+        uint newBal = dx.withdraw(buyToken, balance);
+         
+        alreadyClaimed[_buybackId][acIndex] = true;
 
-            if(alreadyClaimed[_buybackId][acIndex]){
-                continue;
-            }
-
-            // claim funds from dutchx
-            (balance, ) = dx.claimSellerFunds(sellToken, buyToken, address(this), acIndex);
-            // withdraw funds from dutchx
-            uint newBal = dx.withdraw(buyToken, balance);
-            // set user claimed funds in index
-            alreadyClaimed[_buybackId][acIndex] = true;
-
-            if(shouldBurnToken){ // check if should burn tokens
-                burnTokens(buyToken, burnAddress, balance);
-            } else { // update user balance
-                balances[userAddress][buyToken] = newBal.add(balances[userAddress][buyToken]); 
-            }
-
-            userBuyback.claimedSellOrder = true;
-            
-            emit ClaimWithdraw(userAddress, sellToken, buyToken, balance, acIndex);
-        }
-    }
-
-    /**
-     * @notice isTimePassed
-     */
-    function isTimePassed(uint _expires) internal view returns(bool) {
-        return _expires > block.timestamp;
-    }
-
-    /**
-     * @notice hasEnoughBalance
-     */
-    function hasEnoughBalance(
-        uint _buybackId, 
-        uint[] memory _auctionIndexes, 
-        address _userAddress, 
-        address _sellToken
-    ) internal view returns(bool) {        
-       
-        uint total = 0;
-        for( uint i = 0; i < _auctionIndexes.length; i++ ) {
-            total = auctionIndexWithAmount[_buybackId][_auctionIndexes[i]].add(total);
+        if(shouldBurnToken) {
+            // check if should burn tokens
+            burnTokens(buyToken, burnAddress, balance);
+        } else {
+            // update user balance
+            balances[userAddress][buyToken] = newBal.add(balances[userAddress][buyToken]);
         }
 
-        return total <= balances[_userAddress][_sellToken];
+        userBuyback.claimedSellOrder = true;
+        emit ClaimWithdraw(userAddress, sellToken, buyToken, balance, acIndex);
+    }
+
+    function isCurrentAuction(uint _auctionIndex, address _sellToken, address _buyToken) internal view returns(bool) {
+        uint currentAuctionIndex = dx.getAuctionIndex(_sellToken, _buyToken);
+        return currentAuctionIndex == _auctionIndex;
+    }
+    /**
+     * @notice hasAuctionPassed
+     */
+    function hasAuctionPassed(uint _auctionIndex, address _sellToken, address _buyToken) internal view returns(bool) {
+        uint currentAuctionIndex = dx.getAuctionIndex(_sellToken, _buyToken);
+        return currentAuctionIndex > _auctionIndex;
     }
 
     function hasEnoughTippingBalance(address _userAddress, uint _tipAmount) internal view returns (bool) {
@@ -366,7 +327,7 @@ contract BuyBack {
      * @param _amount Amount of tokens to withdraw
      */
     function withdrawEther(
-        address payable _toAddress, 
+        address payable _toAddress,
         uint _amount
         ) external {
 
@@ -386,8 +347,8 @@ contract BuyBack {
     }
 
     /**
-     * @notice removeBuyBack
-     * Allows releasing expired buyback funds
+     * @notice releaseBuyBackFund
+     *
      */
     function releaseBuyBackFund(uint _buybackId) public {
         address userAddress = msg.sender;
@@ -395,43 +356,35 @@ contract BuyBack {
 
         require(userBuyback.userAddress == userAddress, "only owner can release buyback fund");
         require(userBuyback.hasExecutedBuyback == false, "can only release funds of unexecuted buyback");
-        require(userBuyback.auctionIndexes.length > 0, "user does not exist");
+        require(userBuyback.auctionAmount > 0, "user does not exist");
         
-        if(userBuyback.expires < block.timestamp) {
-            uint[] memory auctionIndexes = userBuyback.auctionIndexes;
-            address sellToken = userBuyback.sellToken;
-            address buyToken = userBuyback.buyToken;
+        address sellToken = userBuyback.sellToken;
+        address buyToken = userBuyback.buyToken;
+        uint auctionIndex = userBuyback.auctionIndex;
+        uint auctionAmount = userBuyback.auctionAmount;
+        uint tipAmount = userBuyback.tipAmount;
 
-            uint total = 0;
-            for(uint i = 0; i < auctionIndexes.length; i++){
-                total = total.add(auctionIndexWithAmount[_buybackId][auctionIndexes[i]]);
-                delete auctionIndexWithAmount[_buybackId][auctionIndexes[i]];
-                delete dxAuctionIndex[_buybackId][auctionIndexes[i]];
-                delete alreadyClaimed[_buybackId][auctionIndexes[i]];
-            }
-            
-            userBuybackAmountTotal[userAddress][sellToken] = userBuybackAmountTotal[userAddress][sellToken].sub(total);
-            userTipAmountTotal[userAddress] = userTipAmountTotal[userAddress].sub(userBuyback.tipAmount);
+        if(hasAuctionPassed(auctionIndex, sellToken, buyToken)) {
+            delete dxAuctionIndex[_buybackId][auctionIndex];
+            delete alreadyClaimed[_buybackId][auctionIndex];
 
-            emit ReleaseBuyBackFund(userAddress, _buybackId, total);
+            userBuybackAmountTotal[userAddress][sellToken] = userBuybackAmountTotal[userAddress][sellToken].sub(auctionAmount);
+            userTipAmountTotal[userAddress] = userTipAmountTotal[userAddress].sub(tipAmount);
+
+            emit ReleaseBuyBackFund(userAddress, _buybackId, auctionAmount);
         } else {
             revert("can not release unexpired buyback funds");
         }
     }
 
     function hasEnoughDeposit(
-        uint[] memory _amounts, 
+        uint _amount, 
         address _tokenAddress, 
         address _userAddress
     ) internal view returns (bool) {
-        uint total = 0;
-        for( uint i = 0; i < _amounts.length; i++ ) {
-            total = _amounts[i].add(total);
-        }
-
         // add existing unfulfilled buyback amounts to ensure user
         // has enough balance to fulfill them all
-        return (total.add(userBuybackAmountTotal[_userAddress][_tokenAddress])) <= balances[_userAddress][_tokenAddress];
+        return (_amount.add(userBuybackAmountTotal[_userAddress][_tokenAddress])) <= balances[_userAddress][_tokenAddress];
     }
 
     /**
@@ -442,8 +395,6 @@ contract BuyBack {
         uint tippingAmount = _tipAmount.add(userTipAmountTotal[_userAddress]);
         return ethBalance >= tippingAmount;
     }
-
-
 
     /**
      * @notice receive ether for compensation
@@ -480,8 +431,8 @@ contract BuyBack {
         address buyToken,
         address burnAddress,
         bool shouldBurnToken,
-        uint[] auctionIndexes,
-        uint[] auctionAmounts
+        uint auctionIndex,
+        uint auctionAmount
     );
 
     event ClaimWithdraw(

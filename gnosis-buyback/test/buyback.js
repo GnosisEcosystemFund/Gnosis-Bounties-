@@ -12,7 +12,6 @@ const {
   takeSnapshot,
   revertToSnapshot,
   catchRevert,
-  increaseTime
 } = require('./util')
 
 contract('Buyback', (accounts) => {
@@ -32,7 +31,7 @@ contract('Buyback', (accounts) => {
     await buyBack.depositSellToken(toWei(40), etherToken.address, {from: InitAccount})
 
     const balance = await buyBack.balances.call(InitAccount, etherToken.address)
-    assert.equal(balance.toString(), toWei(40).toString(), "Failed to deposit tokens")
+    assert.ok(balance.gt(0),"failed to deposit")
 
     console.log(`
     ------------- Beginning Balances --------------- \n
@@ -82,14 +81,10 @@ contract('Buyback', (accounts) => {
 
     // send ether for tips
     await buyBack.sendTransaction({from: InitAccount, value: toWei(10)})
-    // check balance
-    const expectedBalance = 10e18.toString()
-    const actualbalance = await buyBack.etherBalance.call(InitAccount);
-    assert.equal(actualbalance.toString(), expectedBalance, "Failed to deposit ether into contract");
 
-    // expiry date 30 days
-    let now = new Date()
-    now = now.setDate(now.getDate() + 30)
+    // check balance
+    const actualbalance = await buyBack.etherBalance.call(InitAccount);
+    assert.equal(actualbalance.gt(0), true, "Failed to deposit ether into contract");
 
     // create buyback
     const tx = await buyBack.addBuyBack(
@@ -97,10 +92,9 @@ contract('Buyback', (accounts) => {
                         etherToken.address, 
                         BurnAddress,
                         true, 
-                        [ 0, 1 ], 
-                        [ toWei(1), toWei(1) ], 
+                        1, 
+                        toWei(1),
                         toWei(0.01),
-                        now,
                         {from: InitAccount}); 
     return tx.logs[0].args
 
@@ -155,35 +149,14 @@ contract('Buyback', (accounts) => {
           etherToken.address, 
           BurnAddress,
           true, 
-          [0,1], 
-          [ toWei("1") ], 
+          1, 
+          toWei("1"), 
           toWei("0.1"),
-          Date.now(),
           {from: InitAccount}
         ),
         "revert user does not have enough deposit to create buyback "
       )
   })
-
-  it("Should prevent adding without correct expiry time", async() => {
-    // deposit tokens
-    await deposit();
-
-    await catchRevert(
-      buyBack.addBuyBack(
-        tokenGNO.address, 
-        etherToken.address, 
-        BurnAddress,
-        false, 
-        [0,1], 
-        [ toWei("1") ], 
-        toWei("0"),
-        Date.now(),
-        {from: InitAccount}
-      ),
-      "revert Invalid auction index length"
-    )
-})
 
   it("Should deposit tokens", async() => {
     // deposit tokens
@@ -221,7 +194,6 @@ contract('Buyback', (accounts) => {
  
     // add buyback
     const { buybackId } = await createBuyBack()
-    console.log(buybackId.toString())
     await performAuction(buybackId);
 
     await buyBack.claim(buybackId, {from: InitAccount});
@@ -253,27 +225,39 @@ contract('Buyback', (accounts) => {
 
   })
 
-  it("Should allow releasing expired buyback funds", async() => {
+
+  it("Should allow releasing unexecuted buyback funds and withdrawing it", async() => {
     const { buybackId } = await createBuyBack()
+    const { buybackId: buybackId2 } = await createBuyBack()
 
-    // expiry date 30 days
-    let now = new Date()
-    now = now.setDate(now.getDate() + 30)
+    console.log({ buybackId: buybackId.toString()})
+    console.log({ buybackId2: buybackId2.toString()})
 
-    // increase the time by 30 days
-    await increaseTime(now)
-    // releasefunds for buyback
+     // dx auction
+    await performAuction(buybackId);
+
+    await buyBack.claim(buybackId, {from: InitAccount});
+
+    // get current auction index
+    const auctionIndex = (await dx.getAuctionIndex.call(etherToken.address, tokenGNO.address)).toNumber();
+    assert.equal(auctionIndex, 2, "Failed to create auction");
+
+    // should release funds for auction index buybackid2 with auction index 1
     const releaseTx = await buyBack.releaseBuyBackFund(
-      buybackId, {from: InitAccount})
-
+      buybackId2, {from: InitAccount})
     const { totalAmountReleased } = releaseTx.logs[0].args
-    const expectedTotalAmountReleased = toWei(2)
 
+    const expectedTotalAmountReleased = toWei(1)
     assert.equal(totalAmountReleased.toString(), expectedTotalAmountReleased.toString(), "should release the total amount")
+
+    // should be able to withdraw the 79 ethertken
+    await buyBack.withdraw(etherToken.address, WithdrawalAddress, toWei(79), {from: InitAccount})
+    const balance = await buyBack.balances.call(InitAccount, etherToken.address);
+    assert.equal(balance, toWei(0), "Failed to withdraw tokens")
 
   })
 
-  it("Should withdraw all the balance", async() => {
+  it("Should part of account balance", async() => {
     await deposit(); // deposit tokens
 
     await buyBack.withdraw(etherToken.address, WithdrawalAddress, toWei(30), {from: InitAccount})
