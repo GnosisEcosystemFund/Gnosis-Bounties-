@@ -82,8 +82,8 @@ contract BuyBack {
         require(address(_buyToken) != address(0), "Invalid buy token address");
         require(address(_sellToken) != address(0), "Invalid sell token address");
         require(_sellToken != _buyToken, "Invalid buy and sell token address");
-        require(_auctionAmount > 0, "Auction amount less than 0"); // ensure the auction amount is greater than zero
-        require(_auctionIndex > 0, "Auction index less than 0"); // ensure the auction index is not zero 
+        require(_auctionAmount > 0, "Auction amount required to be greater than 0"); // ensure the auction amount is greater than zero
+        require(_auctionIndex > 0, "Auction index required to be greater than 0"); // ensure the auction index is not zero 
 
         uint buybackId = buybacks.length;
 

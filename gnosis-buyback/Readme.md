@@ -42,8 +42,8 @@ addBuyBack(
         address _sellToken, 
         address _burnAddress, 
         bool _burn, 
-        uint[] memory _auctionIndexes, 
-        uint[] memory _auctionAmounts,
+        uint _auctionIndex, 
+        uint _auctionAmount,
         uint _tipAmount,
         uint _expires
 )
@@ -55,9 +55,9 @@ Add a buyback configuration
 You can specify the buytoken e.g. LPT and the sellToken e.g. WETH,
 it also allows to set whether the buytoken should be burnt `bool _burn` or not.<br />
 
-Specify the auction & amount to participate in via the auctionIndexes <em>uint[] auctionIndexes</em> and <em>uint[] auctionAmounts</em>. e.g To participate
+Specify the auction & amount to participate in via the auctionIndex <em>uint auctionIndex</em> and <em>uint auctionAmount</em>. e.g To participate
 in the latest auction for LPT token and buy 10 WETH worth of LPT token,
-<em>[0]</em> and <em>[10]</em> for auctionIndex & amount respectively.
+<em>1</em> and <em>10</em> for auctionIndex & amount respectively.
 <em>tipAmount</em> allows you to tip some ether to the address that invokes the <em>postSellOrder</em> function.<br />
 <em>expires</em> This is time for an unexecuted buyback to expire and the funds released back to the creator. The minimum time is one month.
 
@@ -153,7 +153,7 @@ Release funds of an expired unexecuted buyback.
 ```bash
 $ truffle migrate
 ```
-- Add buyback confiugration via the `addBuyBack` function. This allows you specify the auctionIndexes & amounts to participate in auctions. For example you can specify add a buyback configuration for a user with address `0x1`, with buy token OST & sell token WETH.
+- Add buyback confiugration via the `addBuyBack` function. This allows you specify the auctionIndex & amount to participate in auctions. For example you can specify add a buyback configuration for a user with address `0x1`, with buy token OST & sell token WETH.
 
 ```javascript
 const Buyback = artifacts.require("Buyback")
@@ -169,8 +169,8 @@ const tx = await buyBack.addBuyBack(
        etherToken.address, 
        BurnAddress,
        true, 
-       [ 0, 1 ], 
-       [ toWei(1), toWei(1) ], 
+       1, 
+       toWei(1), 
        toWei(0.01),
        now,
        {from: InitAccount});     
@@ -205,7 +205,7 @@ A project would take part as the seller in an auction, most commonly WETH (but c
 The auction the project would take part in is to buy back their SpecificToken would be WETH-SpecificToken (e.g. WETH as sellToken and SpecificToken as the BidToken).
 The project would pre-submit a WETH (or other ERC20) as the sellVolume to a smart contract, which executes the buybacks on its own. i.e. via the `depositSellToken` function.
 
-They decide to participate in the latest auction by setting auction index to `[0]` and buy 20 WETH worth of SpecificToken.
+They decide to participate in the latest auction by setting auction index to `1` and buy 20 WETH worth of SpecificToken.
 The project can decide to withdraw the bought tokens from the buyback contract via the `withdraw` function.
 
 The project is using the buyback contract to control the volume of tokens available on the market
