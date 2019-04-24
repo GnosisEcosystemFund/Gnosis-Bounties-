@@ -124,9 +124,6 @@ contract('Buyback', (accounts) => {
     
     tokenGNO   = await TokenGNO.deployed()
     etherToken = await EtherToken.deployed()
-    // owlProxy   = await TokenOWLProxy.deployed()
-    // tokenFRT   =  await TokenFRT.deployed();
-    // priceOracleInterface = await PriceOracleInterface.deployed()
     
     console.log(`
       dx: ${dxAddress}
@@ -283,7 +280,7 @@ contract('Buyback', (accounts) => {
 
     await catchRevert(
       buyBack.releaseBuyBackFund(buybackId, {from: InitAccount}),
-      "rever can not release unexpired buyback funds"
+      "revert can not release unexpired buyback funds"
     );
   })
 
