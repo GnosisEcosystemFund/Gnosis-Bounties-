@@ -140,9 +140,18 @@ contract BuyBack {
         // ensure buyback has not  been executed
         require(userBuyback.hasExecutedBuyback == false, "buyback has been executed");
         // check if buyback has expired
-        require(isCurrentAuction(auctionIndex, sellToken, buyToken), "auction index is not current");
-        require(hasEnoughBalance(auctionAmount, userAddress, sellToken), "user does not have enough balance to post sell order");
-        require(hasEnoughTippingBalance(userAddress, tipAmount), "user does not have enough tipping balance");
+        require(
+            hasAuctionPassed(auctionIndex, sellToken, buyToken) == false,
+            "auction index is not current"
+        );
+        require(
+            hasEnoughBalance(auctionAmount, userAddress, sellToken), 
+            "user does not have enough balance to post sell order"
+        );
+        require(
+            hasEnoughTippingBalance(userAddress, tipAmount), 
+            "user does not have enough tipping balance"
+        );
 
 
         uint newBuyerBalance;
@@ -209,19 +218,33 @@ contract BuyBack {
     function claim(uint _buybackId) external {
         Buyback storage userBuyback = buybacks[_buybackId];
         uint auctionAmount = buybacks[_buybackId].auctionAmount;
+        bool hasExecutedBuyback = buybacks[_buybackId].hasExecutedBuyback;
+        uint auctionIndex = userBuyback.auctionIndex;
+        address sellToken = userBuyback.sellToken;
+        address buyToken = userBuyback.buyToken;
 
         // ensure user exists
         require(auctionAmount > 0, "user does not exist"); 
+        // ensure that the buyback has been executed
+        require(
+            hasExecutedBuyback == true, 
+            "can not claim funds of unexecuted buyback"
+        );
+        // ensure that auction has passed before invoking claim
+        require(
+            hasAuctionPassed(auctionIndex, sellToken, buyToken), 
+            "can not claim buyback funds"
+        );
 
-        uint auctionIndex = buybacks[_buybackId].auctionIndex;
         address userAddress = userBuyback.userAddress;
-        address sellToken = userBuyback.sellToken;
-        address buyToken = userBuyback.buyToken;
         bool shouldBurnToken = userBuyback.shouldBurnToken;
         address burnAddress = userBuyback.burnAddress;
 
         uint acIndex = dxAuctionIndex[_buybackId][auctionIndex];
-        require(alreadyClaimed[_buybackId][acIndex] == false, "already claimed funds");
+        require(
+            alreadyClaimed[_buybackId][acIndex] == false, 
+            "already claimed funds"
+        );
 
         uint balance;        
         (balance, ) = dx.claimSellerFunds(sellToken, buyToken, address(this), acIndex);
@@ -241,19 +264,22 @@ contract BuyBack {
         emit ClaimWithdraw(userAddress, sellToken, buyToken, balance, acIndex);
     }
 
-    function isCurrentAuction(uint _auctionIndex, address _sellToken, address _buyToken) internal view returns(bool) {
-        uint currentAuctionIndex = dx.getAuctionIndex(_sellToken, _buyToken);
-        return currentAuctionIndex == _auctionIndex;
-    }
     /**
      * @notice hasAuctionPassed
      */
-    function hasAuctionPassed(uint _auctionIndex, address _sellToken, address _buyToken) internal view returns(bool) {
+    function hasAuctionPassed(
+        uint _auctionIndex, 
+        address _sellToken, 
+        address _buyToken
+    ) internal view returns(bool) {
         uint currentAuctionIndex = dx.getAuctionIndex(_sellToken, _buyToken);
         return currentAuctionIndex > _auctionIndex;
     }
 
-    function hasEnoughTippingBalance(address _userAddress, uint _tipAmount) internal view returns (bool) {
+    function hasEnoughTippingBalance(
+        address _userAddress, 
+        uint _tipAmount
+    ) internal view returns (bool) {
         return etherBalance[_userAddress] >= _tipAmount;
     }
 
@@ -277,7 +303,11 @@ contract BuyBack {
     /**
      * @notice burnTokens
      */
-    function burnTokens(address _tokenAddress, address _burnAddress, uint _amount) internal {
+    function burnTokens(
+        address _tokenAddress, 
+        address _burnAddress, 
+        uint _amount
+    ) internal {
         // transfer the tokens to address(0)
         require(_amount > 0);
         require(Token(_tokenAddress).transfer(_burnAddress, _amount));
@@ -307,7 +337,10 @@ contract BuyBack {
         require(_amount <= userBalance, "amount exceeds available balance");
         // user isn't allowed to withdraw amount that affects
         // the buyback
-        require(userAuctionTotal.add(_amount) <= userBalance, "user not allowed to withdraw balance affecting buyback");
+        require(
+            userAuctionTotal.add(_amount) <= userBalance, 
+            "user not allowed to withdraw balance affecting buyback"
+        );
         require(_amount > 0, "withdrawal amount is not greater than zero");
 
 
@@ -337,7 +370,10 @@ contract BuyBack {
         uint userTipTotal = userTipAmountTotal[userAddress];
         
         require(_amount > 0, "withdrawal amount is not greater than zero");
-        require(userTipTotal.add(_amount) <= userBalance, "user balance is less than available withdrawal amount");
+        require(
+            userTipTotal.add(_amount) <= userBalance,
+            "user balance is less than available withdrawal amount"
+        );
         // withdrawing ether does not affect the current buybacks
 
         userBalance = userBalance.sub(_amount);
