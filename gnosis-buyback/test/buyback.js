@@ -226,10 +226,7 @@ contract('Buyback', (accounts) => {
   it("Should allow releasing unexecuted buyback funds and withdrawing it", async() => {
     const { buybackId } = await createBuyBack()
     const { buybackId: buybackId2 } = await createBuyBack()
-
-    console.log({ buybackId: buybackId.toString()})
-    console.log({ buybackId2: buybackId2.toString()})
-
+    
      // dx auction
     await performAuction(buybackId);
 
