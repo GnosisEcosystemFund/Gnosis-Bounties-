@@ -41,8 +41,6 @@ contract BuyBack {
     // mapping of user address to ether deposit value
     mapping(address => uint) public etherBalance;
 
-    // mapping of buyback id to auction index to dutchx index
-    mapping(uint => mapping(uint => uint)) public dxAuctionIndex;
     // mapping of buyback id to auction id to whether an auction has been clamied
     mapping(uint => mapping(uint => bool)) internal alreadyClaimed;
 
@@ -163,8 +161,8 @@ contract BuyBack {
         depositDutchx(sellToken, auctionAmount);
 
         (dxIndex, newBuyerBalance) = dx.postSellOrder(sellToken, buyToken, auctionIndex, auctionAmount);
-        // maps the auction index to the auction index from dx auction
-        dxAuctionIndex[_buybackId][auctionIndex] = dxIndex;
+        require(dxIndex == auctionIndex, "dutchx auction should equal auction index");
+
         userSellTokenBalance = userSellTokenBalance.sub(auctionAmount);
         balances[userAddress][sellToken] = userSellTokenBalance;
 
@@ -240,17 +238,16 @@ contract BuyBack {
         bool shouldBurnToken = userBuyback.shouldBurnToken;
         address burnAddress = userBuyback.burnAddress;
 
-        uint acIndex = dxAuctionIndex[_buybackId][auctionIndex];
         require(
-            alreadyClaimed[_buybackId][acIndex] == false, 
+            alreadyClaimed[_buybackId][auctionIndex] == false, 
             "already claimed funds"
         );
 
         uint balance;        
-        (balance, ) = dx.claimSellerFunds(sellToken, buyToken, address(this), acIndex);
+        (balance, ) = dx.claimSellerFunds(sellToken, buyToken, address(this), auctionIndex);
         uint newBal = dx.withdraw(buyToken, balance);
          
-        alreadyClaimed[_buybackId][acIndex] = true;
+        alreadyClaimed[_buybackId][auctionIndex] = true;
 
         if(shouldBurnToken) {
             // check if should burn tokens
@@ -261,7 +258,7 @@ contract BuyBack {
         }
 
         userBuyback.claimedSellOrder = true;
-        emit ClaimWithdraw(userAddress, sellToken, buyToken, balance, acIndex);
+        emit ClaimWithdraw(userAddress, sellToken, buyToken, balance, auctionIndex);
     }
 
     /**
@@ -401,7 +398,6 @@ contract BuyBack {
         uint tipAmount = userBuyback.tipAmount;
 
         if(hasAuctionPassed(auctionIndex, sellToken, buyToken)) {
-            delete dxAuctionIndex[_buybackId][auctionIndex];
             delete alreadyClaimed[_buybackId][auctionIndex];
 
             userBuybackAmountTotal[userAddress][sellToken] = userBuybackAmountTotal[userAddress][sellToken].sub(auctionAmount);
