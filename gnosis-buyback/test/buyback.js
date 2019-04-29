@@ -226,7 +226,7 @@ contract('Buyback', (accounts) => {
   it("Should allow releasing unexecuted buyback funds and withdrawing it", async() => {
     const { buybackId } = await createBuyBack()
     const { buybackId: buybackId2 } = await createBuyBack()
-    
+
      // dx auction
     await performAuction(buybackId);
 
@@ -244,14 +244,14 @@ contract('Buyback', (accounts) => {
     const expectedTotalAmountReleased = toWei(1)
     assert.equal(totalAmountReleased.toString(), expectedTotalAmountReleased.toString(), "should release the total amount")
 
-    // should be able to withdraw the 79 ethertken
+    // should be able to withdraw the 79 ethertoken
     await buyBack.withdraw(etherToken.address, WithdrawalAddress, toWei(79), {from: InitAccount})
     const balance = await buyBack.balances.call(InitAccount, etherToken.address);
     assert.equal(balance, toWei(0), "Failed to withdraw tokens")
 
   })
 
-  it("Should part of account balance", async() => {
+  it("Should withdraw part of account balance that does not affect buyback", async() => {
     await deposit(); // deposit tokens
 
     await buyBack.withdraw(etherToken.address, WithdrawalAddress, toWei(30), {from: InitAccount})
