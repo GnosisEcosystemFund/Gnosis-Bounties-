@@ -22,7 +22,6 @@ contract BuyBack {
         uint auctionAmount;
         uint tipAmount;
         bool hasExecutedBuyback;
-        bool claimedSellOrder;
     }
 
     Buyback[] public buybacks;
@@ -94,7 +93,6 @@ contract BuyBack {
             _auctionIndex, 
             _auctionAmount,
             _tipAmount,
-            false,
             false
         );
 
@@ -257,7 +255,6 @@ contract BuyBack {
             balances[userAddress][buyToken] = newBal.add(balances[userAddress][buyToken]);
         }
 
-        userBuyback.claimedSellOrder = true;
         emit ClaimWithdraw(userAddress, sellToken, buyToken, balance, auctionIndex);
     }
 
