@@ -3,9 +3,10 @@ pragma solidity ^0.5.2;
 import "@gnosis.pm/util-contracts/contracts/Token.sol";
 import "@gnosis.pm/dx-contracts/contracts/DutchExchange.sol";
 import "@gnosis.pm/dx-contracts/contracts/Oracle/PriceOracleInterface.sol";
+import "@gnosis.pm/dx-contracts/contracts/base/SafeTransfer.sol";
 import "./SafeMath.sol";
 
-contract BuyBack {
+contract BuyBack is SafeTransfer {
     using SafeMath for uint;
 
     address owner;
@@ -202,7 +203,7 @@ contract BuyBack {
 
         require(_amount > 0, "Amount not greater than 0");
 
-        require(Token(_tokenAddress).transferFrom(msg.sender, address(this), _amount), "failed to transfer tokens");
+        require(safeTransfer(_tokenAddress, address(this), _amount, true), "failed to transfer tokens");
 
         balances[_userAddress][_tokenAddress] = balances[_userAddress][_tokenAddress].add(_amount);
         emit Deposit(_userAddress, _tokenAddress, _amount);
@@ -304,7 +305,7 @@ contract BuyBack {
     ) internal {
         // transfer the tokens to address(0)
         require(_amount > 0);
-        require(Token(_tokenAddress).transfer(_burnAddress, _amount));
+        require(safeTransfer(_tokenAddress, _burnAddress, _amount, false), "failed to transfer tokens");
         emit Burn(
             _tokenAddress,
             address(0),
@@ -343,7 +344,7 @@ contract BuyBack {
         userBalance = userBalance.sub(_amount);
         balances[_userAddress][_tokenAddress] = userBalance; // set new balance
 
-        require(Token(_tokenAddress).transfer(_toAddress, _amount));
+        require(safeTransfer(_tokenAddress, _toAddress, _amount, false));
 
         emit Withdraw(_userAddress, _tokenAddress, _amount, userBalance);
     }
